@@ -70,7 +70,7 @@ Get-NetTCPConnection -LocalPort 4180 -State Listen
 
 ## Git과 배포
 
-원격 `origin`은 <https://github.com/KJM0603/skull_king.git>입니다. 개발은 `dev`에서 진행하고, 검증한 변경을 `origin/dev`에 푸시합니다. `main` 병합은 사용자의 요청이 있을 때 진행합니다.
+원격 `origin`은 <https://github.com/KJM0603/skull_king.git>입니다. 개발은 `dev`에서 진행하고, 검증한 변경을 `origin/dev`에 푸시합니다. `main`은 배포 기준 브랜치이며, 사용자가 확정한 내용을 반영할 때만 `dev`를 병합하고 `origin/main`에 푸시합니다. 반영 후에는 `dev`로 돌아와 개발합니다. `main` 푸시 자체가 외부 서버 배포를 의미하지는 않습니다.
 
 ```powershell
 git status
