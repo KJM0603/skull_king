@@ -27,6 +27,9 @@ test('실제 HTTP: 시작 권한·비공개 예측·잘못된 제출·전체 게
   assert.equal(started.value.phase, 'bidding');
   assert.equal(started.value.players.length, 4);
   const first = started.value.game;
+  const seats = [...first.seatOrder];
+  assert.equal(first.direction, 'clockwise');
+  assert.deepEqual((await call('state', guest.token)).value.game.seatOrder, seats);
   assert.deepEqual(first.timeLimits, { bidSeconds: 20, playSeconds: 15 });
   assert.equal(first.hand.length, 1);
   assert.equal('hands' in first, false);
@@ -49,7 +52,8 @@ test('실제 HTTP: 시작 권한·비공개 예측·잘못된 제출·전체 게
   assert.equal(room.game.phase, 'playing');
   const exposed = (await call('state', guest.token)).value.game;
   assert.equal(exposed.players.find(player => player.id === host.state.selfId).bid, 0);
-  assert.equal((await call('game/play', guest.token, { ...stamp(), trickNumber: 1, cardId: privateView.hand[0].id })).status, 400);
+  const notTurnToken = room.game.turnId === guest.state.selfId ? host.token : guest.token;
+  assert.equal((await call('game/play', notTurnToken, { ...stamp(), trickNumber: 1, cardId: privateView.hand[0].id })).status, 400);
   assert.equal((await call('game/play', host.token, { ...stamp(), trickNumber: 999, cardId: first.hand[0].id })).status, 400);
   assert.equal((await call('game/play', host.token, { ...stamp(), trickNumber: 1, cardId: 'missing' })).status, 400);
 
@@ -61,6 +65,7 @@ test('실제 HTTP: 시작 권한·비공개 예측·잘못된 제출·전체 게
   while (room.game.phase !== 'finished' && steps++ < 8000) {
     lobby.tick(Date.now() + 2000);
     const game = room.game;
+    assert.deepEqual(game.players, seats);
     if (game.phase === 'bidding') {
       for (const [id, token] of humanTokens) {
         if (Object.hasOwn(game.bids, id)) continue;

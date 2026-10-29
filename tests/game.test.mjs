@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDeck, leadSuit, legalCards, resolveTrick, scoreRound, createGame, bid, play, advanceTrick, dealRound, gameView, chooseBid, choosePlay, BID_TIMEOUT_MS, PLAY_TIMEOUT_MS } from '../src/game.mjs';
+import { createDeck, leadSuit, legalCards, resolveTrick, scoreRound, createGame as createRandomGame, bid, play, advanceTrick, dealRound, gameView, chooseBid, choosePlay, BID_TIMEOUT_MS, PLAY_TIMEOUT_MS } from '../src/game.mjs';
 import { Lobby } from '../src/lobby.mjs';
 
+// Existing rule fixtures use stable seating; production seating is tested separately.
+const createGame = (players, now) => createRandomGame(players, now, size => size - 1);
 const num = (suit, value) => ({ id: `${suit}-${value}`, type: 'number', suit, value });
 const special = (type, mode) => ({ id: type, type, ...(mode ? { mode } : {}) });
 const trick = (...cards) => cards.map((card, index) => ({ playerId: `p${index}`, card }));
@@ -90,7 +92,7 @@ test('1인 AI 바로 시작, 타임아웃 자동 진행, 이탈 대체와 사람
   lobby.tick(46_000);
   assert.equal(game.phase, 'playing');
   assert.equal(game.autoBids[host.state.selfId], true);
-  lobby.tick(92_000);
+  for (let index = 0; index < game.players.length; index++) lobby.tick(92_000 + index * 46_000);
   assert.equal(game.hands[host.state.selfId].length, 0);
   lobby.leave(host.token);
   assert.equal(lobby.rooms.size, 0);
@@ -151,6 +153,7 @@ test('예측 20초와 카드 15초의 경계에서만 자동 제출', () => {
   assert.equal(view.game.deadlineAt, 21_000);
   assert.deepEqual(view.game.timeLimits, { bidSeconds: 20, playSeconds: 15 });
   const game = lobby.session(host.token).room.game;
+  game.roundStarter = host.state.selfId; // Isolate the human timeout boundary from random seating.
   lobby.tick(20_999);
   assert.equal(game.phase, 'bidding');
   assert.equal(Object.hasOwn(game.bids, host.state.selfId), false);
@@ -187,4 +190,31 @@ test('각 참가자의 새 차례와 다음 트릭은 15초, 새 라운드 예�
   assert.equal(game.phase, 'round-result');
   dealRound(game, 10_000);
   assert.equal(game.deadlineAt, 30_000);
+});
+
+test('서버 좌석 셔플은 시작 때 한 번, 모든 참가자와 라운드에 동일한 시계 방향', () => {
+  const players = ['a', 'b', 'c', 'd'].map(id => ({ id }));
+  const game = createRandomGame(players, 0, () => 0);
+  assert.deepEqual(game.players, ['b', 'c', 'd', 'a']);
+  assert.deepEqual(players.map(player => player.id), ['a', 'b', 'c', 'd'], 'lobby order is untouched');
+  for (const { id } of players) {
+    const view = gameView(game, id);
+    assert.deepEqual(view.seatOrder, game.players);
+    assert.equal(view.direction, 'clockwise');
+    view.seatOrder.reverse();
+    assert.deepEqual(game.players, ['b', 'c', 'd', 'a'], 'view cannot mutate server seats');
+  }
+  for (const id of game.players) bid(game, id, 0, 0);
+  assert.equal(game.turnId, 'b');
+  for (const id of ['b', 'c', 'd', 'a']) {
+    assert.equal(game.turnId, id);
+    const card = game.hands[id][0];
+    play(game, id, card.id, 'escape', 0);
+  }
+  advanceTrick(game, 0);
+  dealRound(game, 0);
+  assert.deepEqual(game.players, ['b', 'c', 'd', 'a']);
+  assert.equal(game.roundStarter, 'c');
+  const production = createRandomGame(players, 0);
+  assert.deepEqual([...production.players].sort(), ['a', 'b', 'c', 'd']);
 });

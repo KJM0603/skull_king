@@ -13,6 +13,7 @@ let resultSignature = '';
 let roundSignature = '';
 let phaseSignature = '';
 let uiBusy = false;
+let drag;
 const scoreboard = new Map();
 const trickSlots = new Map();
 const descriptions = { escape: '승부를 피해 가는 카드. 모두 도망이면 먼저 낸 사람이 이깁니다.', pirate: '숫자와 인어를 이기는 해적. 스컬킹을 조심하세요.', king: '모든 해적을 압도하는 스컬킹. 인어에게는 집니다.', mermaid: '스컬킹을 잡는 인어. 해적에게는 집니다.', tigress: '제출할 때 해적 또는 도망으로 사용할 수 있습니다.' };
@@ -27,6 +28,9 @@ const emblems = {
 };
 export function configureGameUI(submit) {
   send = submit;
+  drag = configureCardDrag({ hand: $('hand'), zone: $('table-drop-zone'), canPlay,
+    context: () => state?.game ? `${state.game.id}:${state.game.round}:${state.game.trickNumber}:${state.game.phase}:${state.game.turnId}:${state.game.deadlineAt}` : '',
+    pick: cardId => { selected = cardId; updateSelection(); syncGameControls(uiBusy); }, submit: submitCard });
   $('bid-form').addEventListener('submit', event => {
     event.preventDefault();
     if (state?.game) send('game/bid', { ...stamp(), bid: Number($('bid-value').value) });
@@ -34,7 +38,8 @@ export function configureGameUI(submit) {
   $('hand').addEventListener('click', event => {
     const button = event.target.closest('button[data-card-id]');
     if (!button || button.disabled) return;
-    selected = button.dataset.cardId;
+    if (drag.consumeClick(button.dataset.cardId, event.detail)) return;
+    selected = selected === button.dataset.cardId ? null : button.dataset.cardId;
     updateSelection();
     syncGameControls(uiBusy);
   });
@@ -46,12 +51,30 @@ export function configureGameUI(submit) {
   });
   $('bid-value').addEventListener('input', updateBidOptions);
   $('tigress-mode').addEventListener('change', updateSelection);
-  $('play-submit').addEventListener('click', () => {
-    if (selected && state?.game) send('game/play', { ...stamp(), trickNumber: state.game.trickNumber, cardId: selected, mode: $('tigress-mode').value });
-  });
+  $('play-submit').addEventListener('click', () => submitCard(selected));
   $('next-round').addEventListener('click', () => { if (state?.game) send('game/next', stamp()); });
   $('return-lobby').addEventListener('click', () => { if (state?.game) send('game/lobby', stamp()); });
   setInterval(updateTimer, 250);
+}
+function canPlay(cardId) {
+  const game = state?.game;
+  return !uiBusy && Boolean(game && game.phase === 'playing' && game.turnId === state.selfId && game.playableCardIds.includes(cardId) && (!game.deadlineAt || game.deadlineAt > Date.now()));
+}
+function submitCard(cardId) {
+  if (!canPlay(cardId)) return;
+  send('game/play', { ...stamp(), trickNumber: state.game.trickNumber, cardId, mode: $('tigress-mode').value });
+}
+function seats() { return state.game.seatOrder ?? state.game.players.map(player => player.id); }
+function positionAtSeat(element, playerId, cards = false) {
+  const order = seats();
+  const index = order.indexOf(playerId);
+  const angle = -Math.PI / 2 + index * 2 * Math.PI / order.length;
+  // The same absolute seat is shown to every player; the active seat never rotates the table.
+  element.style.setProperty('--seat-x', Math.cos(angle));
+  element.style.setProperty('--seat-y', Math.sin(angle));
+  element.style.setProperty('--card-y', Math.sin(angle) * Math.abs(Math.sin(angle)));
+  element.dataset.seat = String(index + 1);
+  if (!cards) element.setAttribute('aria-label', `${index + 1}번 좌석 · ${playerName(playerId)}`);
 }
 function updateBidOptions() {
   for (const button of $('bid-options').children) button.setAttribute('aria-pressed', String(button.dataset.bid === $('bid-value').value));
@@ -103,6 +126,7 @@ function updateSelection() {
 export function renderGame(next, busy) {
   state = next;
   updateTimer();
+  drag?.validate();
   const game = next?.game;
   $('game').hidden = !game;
   document.querySelector('main').classList.toggle('is-playing', Boolean(game));
@@ -123,15 +147,16 @@ export function renderGame(next, busy) {
   for (const [id, row] of scoreboard) {
     if (!next.players.some(player => player.id === id)) { row.remove(); scoreboard.delete(id); }
   }
-  for (const player of next.players) {
+  for (const player of [...next.players].sort((a, b) => seats().indexOf(a.id) - seats().indexOf(b.id))) {
     const info = game.players.find(value => value.id === player.id);
     if (!info) continue;
     let row = scoreboard.get(player.id);
     if (!row) { row = document.createElement('div'); row.className = 'score-player'; row.append(document.createElement('strong'), document.createElement('span'), document.createElement('small'), document.createElement('div')); row.children[3].className = 'seat-avatar'; row.children[3].setAttribute('aria-hidden', 'true'); scoreboard.set(player.id, row); $('scoreboard').append(row); }
     row.children[3].textContent = player.id === next.selfId ? '♛' : player.isBot ? '⚓' : '⚔';
+    positionAtSeat(row, player.id);
     row.classList.toggle('my-seat', player.id === next.selfId);
     row.classList.toggle('active-seat', game.turnId === player.id);
-    row.children[0].textContent = `${player.name}${player.isBot ? ' · AI' : ''}${player.id === next.selfId ? ' (나)' : ''}`;
+    row.children[0].textContent = `${row.dataset.seat}. ${player.name}${player.isBot ? ' · AI' : ''}${player.id === next.selfId ? ' (나)' : ''}`;
     row.children[1].textContent = `${info.score}점`;
     row.children[2].textContent = game.phase === 'bidding' ? info.hasBid ? '예측 제출 완료' : '예측 중' : `예측 ${info.bid} / 획득 ${info.won} · ${info.cardCount}장`;
   }
@@ -139,6 +164,12 @@ export function renderGame(next, busy) {
   const limits = game.timeLimits ?? { bidSeconds: 45, playSeconds: 45 };
   const myTurn = game.phase === 'playing' && game.turnId === next.selfId;
   const resultPhase = ['round-result', 'finished'].includes(game.phase);
+  const order = seats();
+  const nextId = game.turnId ? order[(order.indexOf(game.turnId) + 1) % order.length] : null;
+  setText('turn-order', game.turnId ? game.trick.length === order.length - 1
+    ? `↻ ${playerName(game.turnId)} · 이번 트릭의 마지막 차례`
+    : `↻ 시계 방향 · ${playerName(game.turnId)} → ${playerName(nextId)}`
+    : '↻ 시계 방향 · 좌석은 이번 게임이 끝날 때까지 고정됩니다');
   $('game').classList.toggle('my-turn', myTurn);
   $('game').dataset.phase = game.phase;
   $('phase-badge').textContent = game.phase === 'bidding' ? '예측의 시간' : resultPhase ? '항해 기록' : `TRICK ${game.trickNumber} / ${game.cardsDealt}`;
@@ -162,6 +193,7 @@ export function renderGame(next, busy) {
       const label = document.createElement('span'); label.textContent = playerName(play.playerId);
       slot.append(label, cardElement(play.card));
       trickSlots.set(play.playerId, slot); $('trick-area').append(slot);
+      positionAtSeat(slot, play.playerId, true);
     }
     slot.classList.toggle('winner', game.phase === 'trick-result' && game.lastTrick?.winnerId === play.playerId);
   }
@@ -205,6 +237,7 @@ export function renderGame(next, busy) {
 }
 export function syncGameControls(busy) {
   uiBusy = busy;
+  drag?.validate();
   const game = state?.game;
   if (!game) return;
   const own = game.players.find(player => player.id === state.selfId);
@@ -218,8 +251,95 @@ export function syncGameControls(busy) {
     button.classList.toggle('playable', myTurn && game.playableCardIds.includes(button.dataset.cardId));
     button.classList.toggle('unplayable', myTurn && !game.playableCardIds.includes(button.dataset.cardId));
   }
-  $('play-submit').disabled = busy || !myTurn || !selected || !game.playableCardIds.includes(selected);
+  $('play-submit').disabled = !canPlay(selected);
   $('play-submit').classList.toggle('ready-to-play', !$('play-submit').disabled);
   $('next-round').disabled = busy || state.selfId !== state.hostId || game.phase !== 'round-result';
   $('return-lobby').disabled = busy || state.selfId !== state.hostId || game.phase !== 'finished';
+}
+
+// Pointer events support mouse, pen and an upward touch drag. Horizontal touch
+// movement remains the browser's native hand scrolling (touch-action: pan-x).
+export function configureCardDrag({ hand, zone, canPlay, context, pick, submit }) {
+  let gesture = null;
+  let suppressClick = null;
+  const hint = document.getElementById('drop-hint');
+  function clean() {
+    const old = gesture;
+    gesture = null;
+    old?.ghost?.remove();
+    old?.button.classList.remove('drag-source');
+    zone.classList.remove('drop-ready', 'drop-over');
+    if (old?.button.hasPointerCapture(old.pointerId)) old.button.releasePointerCapture(old.pointerId);
+    hint.textContent = '내 차례에 카드를 끌어 놓으세요';
+    return old;
+  }
+  function overTable(x, y) {
+    const r = zone.getBoundingClientRect();
+    const hit = document.elementFromPoint(x, y);
+    return Boolean(hit?.closest('#round-table') && !hit.closest('.score-player')) &&
+      ((x - r.left - r.width / 2) / (r.width / 2)) ** 2 + ((y - r.top - r.height / 2) / (r.height / 2)) ** 2 <= 1;
+  }
+  hand.addEventListener('pointerdown', event => {
+    if (gesture || event.button !== 0 || event.isPrimary === false) return;
+    const button = event.target.closest('button[data-card-id]');
+    if (!button || button.disabled || !canPlay(button.dataset.cardId)) return;
+    suppressClick = null;
+    gesture = { button, cardId: button.dataset.cardId, pointerId: event.pointerId, type: event.pointerType, x: event.clientX, y: event.clientY, context: context(), ghost: null };
+  });
+  document.addEventListener('pointermove', event => {
+    const g = gesture;
+    if (!g || g.pointerId !== event.pointerId) return;
+    if (g.context !== context() || !canPlay(g.cardId)) { cancel(); return; }
+    const dx = event.clientX - g.x, dy = event.clientY - g.y;
+    if (!g.ghost) {
+      if (Math.hypot(dx, dy) < 9) return;
+      if (g.type === 'touch' && (Math.abs(dx) > Math.abs(dy) || dy > 0)) { clean(); return; }
+      pick(g.cardId);
+      const r = g.button.getBoundingClientRect();
+      g.ghost = g.button.cloneNode(true);
+      g.ghost.removeAttribute('data-card-id');
+      g.ghost.removeAttribute('aria-pressed');
+      g.ghost.setAttribute('aria-hidden', 'true');
+      g.ghost.tabIndex = -1;
+      g.ghost.className = `${g.button.className} card-drag-ghost`;
+      g.ghost.style.width = `${r.width}px`; g.ghost.style.height = `${r.height}px`;
+      document.body.append(g.ghost);
+      g.button.classList.add('drag-source');
+      g.button.setPointerCapture(event.pointerId);
+      zone.classList.add('drop-ready');
+    }
+    event.preventDefault();
+    g.ghost.style.left = `${event.clientX}px`; g.ghost.style.top = `${event.clientY}px`;
+    const over = overTable(event.clientX, event.clientY);
+    zone.classList.toggle('drop-over', over);
+    hint.textContent = over ? '여기에 놓으면 제출됩니다' : '원탁 안으로 끌어 놓으세요';
+  }, { passive: false });
+  document.addEventListener('pointerup', event => {
+    const g = gesture;
+    if (!g || g.pointerId !== event.pointerId) return;
+    const dragged = Boolean(g.ghost);
+    const valid = dragged && g.context === context() && canPlay(g.cardId) && overTable(event.clientX, event.clientY);
+    if (dragged) suppressClick = g.cardId;
+    clean();
+    if (valid) submit(g.cardId);
+  });
+  const interrupted = event => { if (gesture?.pointerId === event.pointerId) cancel(); };
+  document.addEventListener('pointercancel', interrupted);
+  hand.addEventListener('lostpointercapture', interrupted);
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') cancel(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) cancel(); });
+  globalThis.addEventListener?.('blur', cancel);
+  function cancel() {
+    if (gesture?.ghost) suppressClick = gesture.cardId;
+    clean();
+  }
+  return {
+    cancel,
+    validate() { if (gesture && (gesture.context !== context() || !canPlay(gesture.cardId))) cancel(); },
+    consumeClick(cardId, detail) {
+      const suppress = detail !== 0 && suppressClick === cardId;
+      suppressClick = null;
+      return suppress;
+    },
+  };
 }

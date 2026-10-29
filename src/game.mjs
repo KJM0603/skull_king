@@ -55,10 +55,15 @@ export function scoreRound(bid, won, cardsDealt, bonus = 0) {
   return { bid, won, exact, base, bonus: exact ? bonus : 0, points: base + (exact ? bonus : 0) };
 }
 
-export function createGame(players, now = Date.now()) {
+export function createGame(players, now = Date.now(), randomIndex = randomInt) {
   if (players.length < 3 || players.length > 8) throw new Error('기본 모드는 AI를 포함해 3~8명으로 진행합니다.');
+  const seats = players.map(player => player.id);
+  for (let index = seats.length - 1; index > 0; index--) {
+    const other = randomIndex(index + 1);
+    [seats[index], seats[other]] = [seats[other], seats[index]];
+  }
   const game = {
-    id: randomUUID(), players: players.map(player => player.id), round: 0,
+    id: randomUUID(), players: seats, round: 0,
     scores: Object.fromEntries(players.map(player => [player.id, 0])), history: [],
     bidMs: BID_TIMEOUT_MS, playMs: PLAY_TIMEOUT_MS, botMs: 650, resultMs: 1800,
   };
@@ -163,6 +168,7 @@ export function gameView(game, playerId) {
   const reveal = game.phase !== 'bidding';
   return {
     id: game.id, phase: game.phase, round: game.round, cardsDealt: game.cardsDealt, totalRounds: 10,
+    seatOrder: [...game.players], direction: 'clockwise',
     turnId: game.turnId, trickNumber: game.trickNumber, leadSuit: leadSuit(game.trick),
     deadlineAt: game.deadlineAt, submittedCount: Object.keys(game.bids).length,
     timeLimits: { bidSeconds: game.bidMs / 1000, playSeconds: game.playMs / 1000 },

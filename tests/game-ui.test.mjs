@@ -5,8 +5,10 @@ import assert from 'node:assert/strict';
 class Element {
   children = []; dataset = {}; attributes = {}; listeners = {}; value = ''; hidden = false; disabled = false; textContent = '';
   classes = new Set();
+  style = { setProperty: (key, value) => { this.attributes[key] = value; } };
   classList = {
     add: name => this.classes.add(name),
+    remove: (...names) => names.forEach(name => this.classes.delete(name)),
     contains: name => this.classes.has(name),
     toggle: (name, on) => { if (on ?? !this.classes.has(name)) this.classes.add(name); else this.classes.delete(name); },
   };
@@ -25,7 +27,7 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
   const nodes = new Map();
   const get = id => { if (!nodes.has(id)) nodes.set(id, new Element()); return nodes.get(id); };
   const original = { document: globalThis.document, matchMedia: globalThis.matchMedia, setInterval: globalThis.setInterval };
-  globalThis.document = { getElementById: get, querySelector: get, createElement: () => new Element(), createElementNS: () => new Element() };
+  globalThis.document = { getElementById: get, querySelector: get, createElement: () => new Element(), createElementNS: () => new Element(), addEventListener() {} };
   globalThis.matchMedia = () => ({ matches: true });
   globalThis.setInterval = () => 0;
   try {
@@ -36,21 +38,30 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
     const green = { id: 'g', type: 'number', suit: 'green', value: 14 };
     const state = {
       selfId: 'me', hostId: 'me', code: 'TEST01', players: [{ id: 'me', name: '선장' }, { id: 'other', name: '선원' }],
-      game: { id: 'game1', round: 2, cardsDealt: 2, phase: 'bidding', trickNumber: 1, trick: [], hand: [tigress, green],
+      game: { id: 'game1', round: 2, cardsDealt: 2, phase: 'bidding', trickNumber: 1, trick: [], hand: [tigress, green], seatOrder: ['other', 'me'],
         players: [{ id: 'me', score: 0, hasBid: false, cardCount: 2, bid: null, won: 0 }, { id: 'other', score: 0, hasBid: false, cardCount: 2, bid: null, won: 0 }],
         playableCardIds: [], submittedCount: 0, timeLimits: { bidSeconds: 20, playSeconds: 15 } },
     };
     renderGame(state, false);
+    const ownSeat = get('scoreboard').children.find(row => row.classList.contains('my-seat'));
+    assert.equal(ownSeat.dataset.seat, '2', 'server seat order takes precedence over lobby order');
+    const ownPosition = [ownSeat.attributes['--seat-x'], ownSeat.attributes['--seat-y']];
     assert.equal(get('bid-options').children.length, 3);
     get('bid-options').fire('click', get('bid-options').children[2]);
     const hand = get('hand').children;
     get('hand').fire('click', hand[0]);
     assert.equal(hand[0].attributes['aria-pressed'], 'true');
+    get('hand').fire('click', hand[0]);
+    assert.equal(hand[0].attributes['aria-pressed'], 'false', 'second click clears selection');
+    assert.ok(get('tigress-choice').hidden);
+    assert.ok(get('play-submit').disabled);
+    get('hand').fire('click', hand[0]);
     assert.equal(get('play-submit').disabled, true, 'inspection during bidding must not allow play');
     get('tigress-mode').value = 'escape';
     state.game.submittedCount = 1;
     renderGame(state, false);
     assert.equal(get('bid-value').value, '2');
+    assert.deepEqual([ownSeat.attributes['--seat-x'], ownSeat.attributes['--seat-y']], ownPosition);
     assert.equal(get('hand').children, hand, 'progress updates preserve the actual hand DOM');
     assert.equal(get('tigress-mode').value, 'escape');
     get('bid-form').fire('submit');
@@ -79,6 +90,8 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
     state.game.trick = [{ playerId: 'other', card: green }];
     renderGame(state, false);
     const slot = get('trick-area').children[0];
+    assert.equal(slot.dataset.seat, '1', 'submitted card stays at its owner seat');
+    assert.match(get('turn-order').textContent, /마지막 차례/);
     state.game.phase = 'trick-result'; state.game.lastTrick = { number: 1, winnerId: 'other', bonus: 10 };
     renderGame(state, false);
     assert.equal(get('trick-area').children[0], slot, 'same trick nodes survive result transition');
