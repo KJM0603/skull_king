@@ -60,6 +60,7 @@ export function createApp() {
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('요청 형식이 올바르지 않습니다.');
         if (path === '/api/rooms') return json(201, lobby.create(body.name));
         if (path === '/api/join') return json(200, lobby.join(body.code, body.name));
+        if (path === '/api/resume') return json(200, lobby.resume(body.resumeToken));
         const token = request.headers.authorization?.replace(/^Bearer /, '');
         if (path === '/api/bots/add') return json(200, lobby.addBot(token));
         if (path === '/api/bots/remove') return json(200, lobby.removeBot(token, body.playerId));

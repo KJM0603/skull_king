@@ -1,6 +1,8 @@
 import { configureGameUI, renderGame, syncGameControls } from './game-ui.js';
 const $ = id => document.getElementById(id);
 const storageKey = 'skull-king-session';
+const resumeKey = 'skull-king-resume';
+let recovery = readRecovery();
 let token = sessionStorage.getItem(storageKey);
 let state = null;
 let busy = false;
@@ -12,6 +14,33 @@ for (const id of ['rulebook-open', 'game-rulebook-open']) {
   $(id).addEventListener('click', () => { if (!$('rulebook').open) $('rulebook').showModal(); });
 }
 $('rulebook-close').addEventListener('click', () => $('rulebook').close());
+
+function readRecovery() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(resumeKey));
+    return typeof saved?.resumeToken === 'string' && typeof saved.code === 'string' && typeof saved.name === 'string' ? saved : null;
+  } catch { return null; }
+}
+
+function storeRecovery(saved) {
+  recovery = saved;
+  try {
+    if (saved) localStorage.setItem(resumeKey, JSON.stringify(saved));
+    else localStorage.removeItem(resumeKey);
+  } catch { /* This tab can still resume when persistent storage is unavailable. */ }
+}
+
+function syncRecovery() {
+  $('resume-panel').hidden = !recovery;
+  $('resume-help').textContent = recovery ? `${recovery.name} · 방 ${recovery.code}. 비운 자리는 AI가 대신합니다. 모든 사람이 나가면 10분 동안 복귀할 수 있습니다. 같은 브라우저·주소에서 이용해 주세요.` : '';
+}
+
+function acceptEntry(result) {
+  token = result.token;
+  sessionStorage.setItem(storageKey, token);
+  if (result.resumeToken) storeRecovery({ resumeToken: result.resumeToken, code: result.state.code, name: result.state.players.find(player => player.id === result.state.selfId).name });
+  show(result.state);
+}
 
 async function api(path, body) {
   const response = await fetch(`/api/${path}`, {
@@ -34,6 +63,7 @@ function show(next) {
   renderGame(next, busy);
   $('entry').hidden = Boolean(next);
   $('room').hidden = !next || Boolean(next.game);
+  syncRecovery();
   if (!next) { playerRows.clear(); $('players').replaceChildren(); return; }
   $('room-code').textContent = next.code;
   $('count').textContent = `${next.players.length} / ${next.capacity}명 · 준비 ${next.players.filter(player => player.ready).length}명`;
@@ -102,10 +132,16 @@ async function action(work) {
 
 async function enter(path) {
   const result = await api(path, { name: $('name').value, code: $('code').value });
-  token = result.token;
-  sessionStorage.setItem(storageKey, token);
-  show(result.state);
+  acceptEntry(result);
 }
+$('resume-seat').addEventListener('click', () => action(async () => {
+  if (!recovery) return;
+  try { acceptEntry(await api('resume', { resumeToken: recovery.resumeToken })); }
+  catch (error) {
+    if (error.status === 401) { storeRecovery(null); syncRecovery(); }
+    throw error;
+  }
+}));
 $('create').addEventListener('click', () => action(() => enter('rooms')));
 $('join-form').addEventListener('submit', event => { event.preventDefault(); action(() => enter('join')); });
 configureGameUI((path, body) => action(async () => { show(await api(path, body)); }));
@@ -124,9 +160,12 @@ $('ready').addEventListener('click', () => action(async () => {
 }));
 $('leave').addEventListener('click', () => action(async () => {
   await api('leave', {});
+  const wasPlaying = Boolean(state?.game);
+  if (!wasPlaying && recovery?.code === state?.code) storeRecovery(null);
   token = null;
   sessionStorage.removeItem(storageKey);
   show(null);
+  if (wasPlaying) $('message').textContent = 'AI가 자리를 이어받았습니다. 이전 자리로 복귀를 누르면 직접 이어서 플레이할 수 있습니다.';
 }));
 $('game-leave').addEventListener('click', () => $('leave').click());
 $('copy').addEventListener('click', () => action(async () => {
@@ -160,4 +199,5 @@ async function refresh() {
   }
   setTimeout(refresh, 1000);
 }
+syncRecovery();
 refresh();

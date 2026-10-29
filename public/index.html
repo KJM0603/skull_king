@@ -23,6 +23,7 @@
     <section class="panel" aria-label="온라인 대기실">
       <div id="entry">
         <p class="eyebrow">WELCOME ABOARD</p><h2>선원을 모아볼까요?</h2>
+        <div id="resume-panel" class="resume-panel" hidden><button id="resume-seat" class="primary" type="button">이전 자리로 복귀</button><p id="resume-help" class="note"></p></div>
         <label for="name">플레이어 이름</label>
         <input id="name" maxlength="20" autocomplete="nickname" placeholder="사용하실 이름을 입력해 주세요">
         <button id="create" class="primary" type="button">새로운 방 만들기 <span>↗</span></button>
@@ -41,7 +42,7 @@
       <p id="message" role="status" aria-live="polite"></p>
     </section>
     <section id="game" class="game-panel" hidden aria-label="카드 게임">
-      <div class="game-top"><div><p class="eyebrow">THE CAPTAIN’S TABLE</p><h2 id="round-title"></h2></div><div class="game-tools"><span id="game-code"></span><strong id="turn-timer" aria-label="남은 시간"></strong><button id="game-rulebook-open" type="button">룰북</button><button id="game-leave" type="button" aria-label="게임 나가기 · AI로 대체">나가기</button></div></div>
+      <div class="game-top"><div><p class="eyebrow">THE CAPTAIN’S TABLE</p><h2 id="round-title"></h2></div><div class="game-tools"><span id="game-code"></span><strong id="turn-timer" aria-label="남은 시간"></strong><button id="game-rulebook-open" type="button">룰북</button><button id="game-leave" type="button" aria-label="게임 나가기 · AI가 대신하며 나중에 복귀 가능">나가기</button></div></div>
       <p class="landscape-hint"><span aria-hidden="true">↻</span> 휴대전화를 가로로 돌리시면 원탁과 카드를 더 크게 보실 수 있습니다.</p>
       <div class="game-status"><span id="phase-badge" class="phase-badge"></span><h3 id="phase-title" aria-live="polite"></h3><p id="phase-help"></p></div>
       <div id="round-table" class="round-table" aria-label="고정 좌석 원탁 · 시계 방향 진행">

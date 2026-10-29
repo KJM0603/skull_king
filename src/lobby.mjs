@@ -1,9 +1,12 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createGame, dealRound, bid, play, advanceTrick, chooseBid, choosePlay, gameView } from './game.mjs';
 
+export const VACANT_ROOM_MS = 10 * 60_000;
+
 export class Lobby {
   rooms = new Map();
   sessions = new Map();
+  resumptions = new Map();
 
   ensureLobby(room) {
     if (room.game) throw new Error('게임 진행 중에는 참가자 구성을 바꿀 수 없습니다.');
@@ -42,7 +45,50 @@ export class Lobby {
     room.players.push(player);
     room.hostId ??= player.id;
     this.sessions.set(token, { room, player });
-    return { token, state: this.state(token) };
+    const resumeToken = randomBytes(32).toString('hex');
+    this.resumptions.set(resumeToken, { room, player, token });
+    return { token, resumeToken, state: this.state(token) };
+  }
+
+  resume(resumeToken, now = Date.now()) {
+    const record = this.resumptions.get(resumeToken);
+    if (!record || this.rooms.get(record.room.code) !== record.room ||
+        !record.room.players.includes(record.player) ||
+        (record.room.vacantUntil != null && now >= record.room.vacantUntil)) {
+      if (record && record.room.vacantUntil != null && now >= record.room.vacantUntil) this.removeRoom(record.room);
+      const error = new Error('복귀할 자리가 만료되었습니다. 새 방에 참가해 주세요.');
+      error.status = 401;
+      throw error;
+    }
+    const { room, player } = record;
+    // Rotate the active session so an old tab cannot also control this seat.
+    this.sessions.delete(record.token);
+    record.token = randomBytes(32).toString('hex');
+    this.sessions.set(record.token, { room, player });
+    player.isBot = false;
+    delete player.departed;
+    delete room.vacantUntil;
+    room.hostId ??= player.id;
+    return { token: record.token, resumeToken, state: this.state(record.token) };
+  }
+
+  removeRoom(room) {
+    this.rooms.delete(room.code);
+    for (const [key, record] of this.resumptions) {
+      if (record.room === room) {
+        this.sessions.delete(record.token);
+        this.resumptions.delete(key);
+      }
+    }
+  }
+
+  forgetPlayer(player) {
+    for (const [key, record] of this.resumptions) {
+      if (record.player === player) {
+        this.sessions.delete(record.token);
+        this.resumptions.delete(key);
+      }
+    }
   }
 
   session(token) {
@@ -171,6 +217,7 @@ export class Lobby {
     this.hostSession(token);
     const { room, game } = this.gameSession(token, input);
     if (game.phase !== 'finished') throw new Error('게임 종료 후 대기실로 돌아갈 수 있습니다.');
+    room.players.filter(player => player.departed).forEach(player => this.forgetPlayer(player));
     room.players = room.players.filter(player => !player.departed);
     room.game = null;
     room.players.forEach(player => { player.ready = player.isBot; });
@@ -179,6 +226,7 @@ export class Lobby {
 
   tick(now = Date.now()) {
     for (const room of this.rooms.values()) {
+      if (room.vacantUntil != null && now >= room.vacantUntil) { this.removeRoom(room); continue; }
       const game = room.game;
       if (!game) continue;
       if (game.phase === 'bidding') {
@@ -201,11 +249,19 @@ export class Lobby {
 
   leave(token, now = Date.now()) {
     const { room, player } = this.session(token);
-    if (room.game) { player.isBot = true; player.departed = true; player.ready = true; }
-    else room.players = room.players.filter(value => value.id !== player.id);
+    if (room.game) {
+      player.isBot = true; player.departed = true; player.ready = true;
+      room.game.roundSkips = room.game.roundSkips.filter(id => id !== player.id);
+    } else {
+      room.players = room.players.filter(value => value.id !== player.id);
+      this.forgetPlayer(player);
+    }
     this.sessions.delete(token);
     const humans = room.players.filter(value => !value.isBot);
-    if (humans.length === 0) this.rooms.delete(room.code);
+    if (humans.length === 0) {
+      if (room.game) { room.vacantUntil = now + VACANT_ROOM_MS; room.hostId = null; }
+      else this.removeRoom(room);
+    }
     else {
       if (room.hostId === player.id) room.hostId = humans[0].id;
       this.advanceRoundIfReady(room, now);

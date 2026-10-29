@@ -110,3 +110,4 @@
  .game-status p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44vw}
  .game-status h3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:35vw}
 }
+.resume-panel{padding:0 0 16px;margin-bottom:16px;border-bottom:1px solid #ffffff20}.resume-panel .primary{width:100%}.resume-panel .note{line-height:1.6}

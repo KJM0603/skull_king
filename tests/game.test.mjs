@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDeck, leadSuit, legalCards, resolveTrick, scoreRound, createGame as createRandomGame, bid, play, advanceTrick, dealRound, gameView, chooseBid, choosePlay, BID_TIMEOUT_MS, PLAY_TIMEOUT_MS } from '../src/game.mjs';
-import { Lobby } from '../src/lobby.mjs';
+import { Lobby, VACANT_ROOM_MS } from '../src/lobby.mjs';
 
 // Existing rule fixtures use stable seating; production seating is tested separately.
 const createGame = (players, now) => createRandomGame(players, now, size => size - 1);
@@ -94,7 +94,9 @@ test('1인 AI 바로 시작, 타임아웃 자동 진행, 이탈 대체와 사람
   assert.equal(game.autoBids[host.state.selfId], true);
   for (let index = 0; index < game.players.length; index++) lobby.tick(92_000 + index * 46_000);
   assert.equal(game.hands[host.state.selfId].length, 0);
-  lobby.leave(host.token);
+  lobby.leave(host.token, 300_000);
+  assert.equal(lobby.rooms.size, 1);
+  lobby.tick(300_000 + VACANT_ROOM_MS);
   assert.equal(lobby.rooms.size, 0);
 
   const captain = lobby.create('새 선장');
