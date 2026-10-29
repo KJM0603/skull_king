@@ -66,6 +66,7 @@ export function createApp() {
         if (path === '/api/game/start') return json(200, lobby.start(token, body.withBots));
         if (path === '/api/game/bid') return json(200, lobby.submitBid(token, body));
         if (path === '/api/game/play') return json(200, lobby.playCard(token, body));
+        if (path === '/api/game/skip') return json(200, lobby.skipRound(token, body));
         if (path === '/api/game/next') return json(200, lobby.nextRound(token, body));
         if (path === '/api/game/lobby') return json(200, lobby.returnToLobby(token, body));
         if (path === '/api/ready') return json(200, lobby.ready(token, body.ready));

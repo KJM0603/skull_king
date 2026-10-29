@@ -52,7 +52,12 @@ export function configureGameUI(submit) {
   $('bid-value').addEventListener('input', updateBidOptions);
   $('tigress-mode').addEventListener('change', updateSelection);
   $('play-submit').addEventListener('click', () => submitCard(selected));
-  $('next-round').addEventListener('click', () => { if (state?.game) send('game/next', stamp()); });
+  $('next-round').addEventListener('click', () => {
+    const game = state?.game;
+    if (!uiBusy && game?.phase === 'round-result' && !game.roundAdvance?.ownSkipped) {
+      send(game.roundAdvance ? 'game/skip' : 'game/next', stamp());
+    }
+  });
   $('return-lobby').addEventListener('click', () => { if (state?.game) send('game/lobby', stamp()); });
   setInterval(updateTimer, 250);
 }
@@ -83,6 +88,12 @@ export function updateTimer(now = Date.now(), game = state?.game) {
   const seconds = game?.deadlineAt ? Math.max(0, Math.ceil((game.deadlineAt - now) / 1000)) : null;
   setText('turn-timer', seconds === null ? '—' : `${seconds}초`);
   $('turn-timer').classList.toggle('urgent', seconds !== null && seconds <= 5);
+  const transition = game?.phase === 'round-result' ? game.roundAdvance : null;
+  $('round-auto-timer').hidden = !transition;
+  if (transition) {
+    const remaining = Math.max(0, Math.ceil((transition.deadlineAt - now) / 1000));
+    setText('round-auto-timer', remaining > 0 ? `${remaining}초 뒤 다음 라운드로 자동 이동합니다` : '다음 라운드로 이동 중입니다…');
+  }
   const active = ['bidding', 'playing'].includes(game?.phase);
   const visible = active && seconds !== null && seconds > 0 && seconds <= 5;
   $('table-countdown').hidden = !visible;
@@ -228,9 +239,11 @@ export function renderGame(next, busy) {
         return row;
       }));
     }
-    $('result-help').textContent = next.selfId === next.hostId ? game.phase === 'finished' ? '대기실로 돌아가 같은 참가자들과 다시 시작하실 수 있습니다.' : '점수를 확인하신 뒤 다음 라운드를 눌러 주세요.' : '방장이 다음 진행을 선택할 때까지 기다려 주세요.';
+    const progress = game.roundAdvance;
+    setText('result-help', progress ? `스킵 ${progress.skippedCount} / ${progress.requiredCount}명 · 사람 ${progress.eligibleCount}명 중 3분의 2 이상이면 즉시 이동합니다. AI는 투표에서 제외합니다.` : next.selfId === next.hostId ? game.phase === 'finished' ? '대기실로 돌아가 같은 참가자들과 다시 시작하실 수 있습니다.' : '점수를 확인하신 뒤 다음 라운드를 눌러 주세요.' : '방장이 다음 진행을 선택할 때까지 기다려 주세요.');
+    setText('next-round', progress ? `${progress.ownSkipped ? '스킵 동의 완료' : '스킵'} · ${progress.skippedCount} / ${progress.requiredCount}명` : '다음 라운드');
   }
-  $('next-round').hidden = game.phase !== 'round-result' || next.selfId !== next.hostId;
+  $('next-round').hidden = game.phase !== 'round-result' || (!game.roundAdvance && next.selfId !== next.hostId);
   $('return-lobby').hidden = game.phase !== 'finished' || next.selfId !== next.hostId;
   syncGameControls(busy);
   updateTimer();
@@ -253,7 +266,7 @@ export function syncGameControls(busy) {
   }
   $('play-submit').disabled = !canPlay(selected);
   $('play-submit').classList.toggle('ready-to-play', !$('play-submit').disabled);
-  $('next-round').disabled = busy || state.selfId !== state.hostId || game.phase !== 'round-result';
+  $('next-round').disabled = busy || game.phase !== 'round-result' || (game.roundAdvance ? game.roundAdvance.ownSkipped : state.selfId !== state.hostId);
   $('return-lobby').disabled = busy || state.selfId !== state.hostId || game.phase !== 'finished';
 }
 

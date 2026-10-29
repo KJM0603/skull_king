@@ -79,8 +79,11 @@ test('실제 HTTP: 시작 권한·비공개 예측·잘못된 제출·전체 게
       const card = choosePlay(view.hand, view.trick, game.won[id] < game.bids[id]);
       assert.equal((await call('game/play', token, { ...stamp(), trickNumber: game.trickNumber, cardId: card.id, mode: card.mode })).status, 200);
     } else if (game.phase === 'round-result') {
-      assert.equal((await call('game/next', guest.token, stamp())).status, 403);
-      assert.equal((await call('game/next', host.token, stamp())).status, 200);
+      const firstSkip = await call('game/skip', guest.token, stamp());
+      assert.equal(firstSkip.status, 200);
+      assert.equal(firstSkip.value.game.roundAdvance.skippedCount, 1);
+      assert.equal(firstSkip.value.game.roundAdvance.requiredCount, 2);
+      assert.equal((await call('game/skip', host.token, stamp())).status, 200);
     }
   }
   assert.equal(room.game.phase, 'finished');

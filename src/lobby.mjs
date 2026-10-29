@@ -57,11 +57,13 @@ export class Lobby {
 
   state(token) {
     const { room, player } = this.session(token);
+    const game = room.game ? gameView(room.game, player.id) : null;
+    if (game) game.roundAdvance = this.roundAdvance(room, player.id);
     return {
       code: room.code, hostId: room.hostId, selfId: player.id,
       phase: room.game?.phase ?? 'lobby', capacity: 8,
       players: room.players.map(value => ({ ...value })),
-      game: room.game ? gameView(room.game, player.id) : null,
+      game,
     };
   }
 
@@ -132,13 +134,38 @@ export class Lobby {
     return this.state(token);
   }
 
-  nextRound(token, input, now = Date.now()) {
-    this.hostSession(token);
-    const { game } = this.gameSession(token, input);
-    if (game.phase !== 'round-result') throw new Error('아직 다음 라운드로 진행할 수 없습니다.');
-    dealRound(game, now);
+  roundAdvance(room, playerId) {
+    const game = room.game;
+    if (game?.phase !== 'round-result') return null;
+    const humans = room.players.filter(player => !player.isBot && !player.departed);
+    const votes = new Set(game.roundSkips);
+    return {
+      deadlineAt: game.deadlineAt,
+      eligibleCount: humans.length,
+      requiredCount: Math.max(1, Math.ceil(humans.length * 2 / 3)),
+      skippedCount: humans.filter(player => votes.has(player.id)).length,
+      ownSkipped: votes.has(playerId),
+    };
+  }
+
+  advanceRoundIfReady(room, now) {
+    const progress = this.roundAdvance(room);
+    if (progress && (now >= progress.deadlineAt || progress.skippedCount >= progress.requiredCount)) {
+      dealRound(room.game, now);
+    }
+  }
+
+  skipRound(token, input, now = Date.now()) {
+    const { room, game, player } = this.gameSession(token, input);
+    if (game.phase !== 'round-result') throw new Error('라운드 결과를 확인하는 동안에만 스킵할 수 있습니다.');
+    if (player.isBot || player.departed) throw new Error('사람 참가자만 스킵할 수 있습니다.');
+    if (!game.roundSkips.includes(player.id)) game.roundSkips.push(player.id);
+    this.advanceRoundIfReady(room, now);
     return this.state(token);
   }
+
+  // Older clients may still call this path; it cannot bypass the skip threshold.
+  nextRound(token, input, now = Date.now()) { return this.skipRound(token, input, now); }
 
   returnToLobby(token, input) {
     this.hostSession(token);
@@ -168,16 +195,20 @@ export class Lobby {
           play(game, player.id, card.id, card.mode, now);
         }
       } else if (game.phase === 'trick-result' && now >= game.autoAt) advanceTrick(game, now);
+      else if (game.phase === 'round-result') this.advanceRoundIfReady(room, now);
     }
   }
 
-  leave(token) {
+  leave(token, now = Date.now()) {
     const { room, player } = this.session(token);
     if (room.game) { player.isBot = true; player.departed = true; player.ready = true; }
     else room.players = room.players.filter(value => value.id !== player.id);
     this.sessions.delete(token);
     const humans = room.players.filter(value => !value.isBot);
     if (humans.length === 0) this.rooms.delete(room.code);
-    else if (room.hostId === player.id) room.hostId = humans[0].id;
+    else {
+      if (room.hostId === player.id) room.hostId = humans[0].id;
+      this.advanceRoundIfReady(room, now);
+    }
   }
 }

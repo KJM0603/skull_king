@@ -3,6 +3,7 @@ import { randomInt, randomUUID } from 'node:crypto';
 export const SUITS = ['green', 'yellow', 'purple', 'black'];
 export const BID_TIMEOUT_MS = 20_000;
 export const PLAY_TIMEOUT_MS = 15_000;
+export const ROUND_RESULT_MS = 10_000;
 export function createDeck() {
   const deck = SUITS.flatMap(suit => Array.from({ length: 14 }, (_, index) => ({ id: `${suit}-${index + 1}`, type: 'number', suit, value: index + 1 })));
   for (const [type, count] of [['escape', 5], ['pirate', 5], ['mermaid', 2], ['king', 1], ['tigress', 1]]) {
@@ -77,6 +78,7 @@ export function dealRound(game, now) {
   game.hands = Object.fromEntries(game.players.map(id => [id, deck.splice(0, game.cardsDealt)]));
   game.bids = {};
   game.autoBids = {};
+  game.roundSkips = [];
   game.won = Object.fromEntries(game.players.map(id => [id, 0]));
   game.bonuses = Object.fromEntries(game.players.map(id => [id, 0]));
   game.phase = 'bidding';
@@ -138,7 +140,7 @@ export function advanceTrick(game, now) {
     const highest = Math.max(...Object.values(game.scores));
     game.leaderIds = game.players.filter(id => game.scores[id] === highest);
     game.phase = game.round >= 10 && game.leaderIds.length === 1 ? 'finished' : 'round-result';
-    game.deadlineAt = null;
+    game.deadlineAt = game.phase === 'round-result' ? now + ROUND_RESULT_MS : null;
     game.autoAt = null;
   } else {
     game.trickNumber++;

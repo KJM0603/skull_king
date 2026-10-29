@@ -31,7 +31,7 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
   globalThis.matchMedia = () => ({ matches: true });
   globalThis.setInterval = () => 0;
   try {
-    const { configureGameUI, renderGame, syncGameControls } = await import('../public/game-ui.js');
+    const { configureGameUI, renderGame, syncGameControls, updateTimer } = await import('../public/game-ui.js');
     const requests = [];
     configureGameUI((path, body) => requests.push({ path, body }));
     const tigress = { id: 't', type: 'tigress' };
@@ -97,6 +97,45 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
     assert.equal(get('trick-area').children[0], slot, 'same trick nodes survive result transition');
     assert.ok(slot.classList.contains('winner'), 'winner updates even when trick cards did not change');
     assert.ok(get('play-submit').disabled);
+
+    state.selfId = 'other'; // Every human, including a non-host, can vote.
+    state.game.phase = 'round-result';
+    state.game.deadlineAt = Date.now() + 10_000;
+    state.game.history = [{ round: 2, results: state.game.players.map(player => ({ playerId: player.id, bid: 1, won: 1, base: 20, bonus: 0, points: 20, total: 20 })) }];
+    state.game.roundAdvance = { deadlineAt: state.game.deadlineAt, skippedCount: 0, requiredCount: 2, eligibleCount: 2, ownSkipped: false };
+    renderGame(state, false);
+    assert.equal(get('next-round').hidden, false);
+    assert.equal(get('next-round').disabled, false);
+    assert.match(get('next-round').textContent, /스킵.*0 \/ 2명/);
+    get('next-round').fire('click');
+    assert.deepEqual(requests.at(-1), { path: 'game/skip', body: { gameId: 'game1', round: 2 } });
+    const requestCount = requests.length;
+    syncGameControls(true);
+    get('next-round').fire('click');
+    assert.equal(requests.length, requestCount, 'pending skip cannot be submitted twice');
+    syncGameControls(false);
+    assert.equal(get('next-round').disabled, false, 'failed request remains retryable');
+    const scoreRows = get('result-rows').children;
+    state.game.roundAdvance.skippedCount = 1;
+    state.game.roundAdvance.ownSkipped = true;
+    renderGame(state, false);
+    assert.equal(get('next-round').disabled, true);
+    assert.match(get('next-round').textContent, /동의 완료.*1 \/ 2명/);
+    assert.equal(get('result-rows').children, scoreRows, 'vote-only updates preserve result DOM and focus');
+    get('next-round').fire('click');
+    assert.equal(requests.length, requestCount);
+    updateTimer(state.game.deadlineAt - 9000);
+    assert.match(get('round-auto-timer').textContent, /9초 뒤/);
+    assert.equal(get('round-auto-timer').hidden, false);
+    updateTimer(state.game.deadlineAt);
+    assert.match(get('round-auto-timer').textContent, /이동 중/);
+    assert.ok(get('table-countdown').hidden, 'the red action warning stays hidden during round results');
+    state.game.phase = 'finished'; state.game.roundAdvance = null; state.game.deadlineAt = null; state.game.leaderIds = ['me'];
+    renderGame(state, false);
+    assert.ok(get('next-round').hidden);
+    assert.ok(get('round-auto-timer').hidden);
+    assert.equal(get('result-rows').children, scoreRows);
+    state.selfId = 'me';
     state.game.round = 3; state.game.cardsDealt = 3; state.game.phase = 'bidding'; state.game.trick = []; state.game.players[0].hasBid = false;
     renderGame(state, false);
     assert.equal(get('bid-value').value, '0');

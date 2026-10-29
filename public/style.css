@@ -64,3 +64,5 @@
 @keyframes countdown-pulse{from{transform:scale(1.12)}to{transform:scale(1)}}
 @media(prefers-reduced-motion:reduce){.table-countdown strong{animation:none}}
 @media(min-width:851px) and (max-width:1150px){.round-table .score-player{width:120px}.round-table .trick-slot{width:56px;left:calc(50% + var(--seat-x)*27%);top:calc(50% + var(--seat-y)*16%)}.round-table .trick-slot .playing-card{width:56px;height:82px}.round-table .trick-slot .card-art{width:35px;height:43px;top:20px}.round-table .trick-slot .playing-card strong{font-size:15px}.round-table .trick-slot .playing-card small{font-size:8px}.round-table .trick-slot .card-symbol{font-size:8px}}
+
+.round-auto-timer{font-size:clamp(16px,3vw,22px);font-weight:800;color:#f2d99f;margin:14px 0 8px;font-variant-numeric:tabular-nums}#next-round{max-width:100%;white-space:normal}
