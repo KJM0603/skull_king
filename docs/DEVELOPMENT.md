@@ -23,6 +23,19 @@ npm start
 
 초대 링크의 `127.0.0.1`은 다른 기기에서 접속할 수 없습니다. 추후 외부 HTTPS 주소를 구성한 뒤 지인 초대에 사용합니다. 브라우저 보안 환경에 따라 링크 복사가 차단되면 화면의 방 코드를 전달하시면 됩니다.
 
+## 접속할 수 없을 때
+
+첫 확인 주소는 <http://localhost:4180/>입니다. 서버가 실행 중이어야 열립니다. `start-local.cmd` 또는 `npm start`로 실행한 창을 닫으면 서버도 종료됩니다. `localhost` 접속이 어려운 경우 <http://127.0.0.1:4180/>도 확인합니다.
+
+2026-10-29 접속 요청 시 서버가 종료된 상태임을 확인하고, 별도의 숨김 백그라운드 Node.js 프로세스로 다시 실행했습니다. 해당 서버는 채팅 작업 완료 후에도 유지합니다. 재부팅하면 자동으로 시작하지 않습니다. 로그는 Git에서 제외된 `.local/server-4180.stdout.log`, `.local/server-4180.stderr.log`에 있으며, 실행 시 기록한 PID는 `.local/server-4180.pid`에 있습니다. PID 파일은 과거 값일 수 있으므로 중지 전 포트 소유자와 프로세스를 다시 확인합니다. 이미 서버가 실행 중이면 중복 실행하지 않습니다.
+
+```powershell
+Invoke-RestMethod http://localhost:4180/api/health
+Get-NetTCPConnection -LocalPort 4180 -State Listen
+```
+
+정상 서버는 `project: skull_king`, `ok: true`를 응답합니다.
+
 ## 소스 구조
 
 | 위치 | 역할 |
@@ -38,4 +51,12 @@ npm start
 
 ## Git과 배포
 
-최초 로컬 저장소만 생성합니다. 원격 저장소가 정해지면 연결하여 검증된 현재 브랜치를 푸시합니다. GitHub 푸시와 외부 서버 반영은 별도로 확인합니다. 이 프로젝트를 Codex 사이드바의 프로젝트로 등록하려면 이 폴더를 프로젝트로 열어 주세요. 폴더 생성 자체가 사이드바 등록을 뜻하지는 않습니다.
+원격 `origin`은 <https://github.com/KJM0603/skull_king.git>입니다. 개발은 `dev`에서 진행하고, 검증한 변경을 `origin/dev`에 푸시합니다. `main` 병합은 사용자의 요청이 있을 때 진행합니다.
+
+```powershell
+git status
+git switch dev
+git push -u origin dev
+```
+
+GitHub 푸시와 외부 서버 반영은 별도로 확인합니다. 현재 외부 운영 서버에는 배포하지 않았습니다. 이 프로젝트를 Codex 사이드바의 프로젝트로 등록하려면 이 폴더를 프로젝트로 열어 주세요. 폴더 생성 자체가 사이드바 등록을 뜻하지는 않습니다.
