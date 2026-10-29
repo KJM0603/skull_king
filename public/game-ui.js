@@ -78,6 +78,8 @@ function positionAtSeat(element, playerId, cards = false) {
   element.style.setProperty('--seat-x', Math.cos(angle));
   element.style.setProperty('--seat-y', Math.sin(angle));
   element.style.setProperty('--card-y', Math.sin(angle) * Math.abs(Math.sin(angle)));
+  // Spread the two diagonal cards vertically on a shallow landscape table.
+  element.style.setProperty('--wide-card-y', Math.sign(Math.sin(angle)) * Math.sqrt(Math.abs(Math.sin(angle))));
   element.dataset.seat = String(index + 1);
   if (!cards) element.setAttribute('aria-label', `${index + 1}번 좌석 · ${playerName(playerId)}`);
 }
@@ -162,14 +164,12 @@ export function renderGame(next, busy) {
     const info = game.players.find(value => value.id === player.id);
     if (!info) continue;
     let row = scoreboard.get(player.id);
-    if (!row) { row = document.createElement('div'); row.className = 'score-player'; row.append(document.createElement('strong'), document.createElement('span'), document.createElement('small'), document.createElement('div')); row.children[3].className = 'seat-avatar'; row.children[3].setAttribute('aria-hidden', 'true'); scoreboard.set(player.id, row); $('scoreboard').append(row); }
-    row.children[3].textContent = player.id === next.selfId ? '♛' : player.isBot ? '⚓' : '⚔';
+    if (!row) { row = document.createElement('div'); row.className = 'score-player'; row.append(document.createElement('strong')); scoreboard.set(player.id, row); $('scoreboard').append(row); }
     positionAtSeat(row, player.id);
     row.classList.toggle('my-seat', player.id === next.selfId);
     row.classList.toggle('active-seat', game.turnId === player.id);
-    row.children[0].textContent = `${row.dataset.seat}. ${player.name}${player.isBot ? ' · AI' : ''}${player.id === next.selfId ? ' (나)' : ''}`;
-    row.children[1].textContent = `${info.score}점`;
-    row.children[2].textContent = game.phase === 'bidding' ? info.hasBid ? '예측 제출 완료' : '예측 중' : `예측 ${info.bid} / 획득 ${info.won} · ${info.cardCount}장`;
+    row.children[0].textContent = `${player.name}${player.id === next.selfId ? ' (나)' : ''}`;
+    row.setAttribute('title', `${player.name}${player.isBot ? ' · AI' : ''}`);
   }
   const own = game.players.find(player => player.id === next.selfId);
   const limits = game.timeLimits ?? { bidSeconds: 45, playSeconds: 45 };

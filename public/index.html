@@ -41,7 +41,8 @@
       <p id="message" role="status" aria-live="polite"></p>
     </section>
     <section id="game" class="game-panel" hidden aria-label="카드 게임">
-      <div class="game-top"><div><p class="eyebrow">THE CAPTAIN’S TABLE</p><h2 id="round-title"></h2></div><div class="game-tools"><span id="game-code"></span><strong id="turn-timer" aria-label="남은 시간"></strong><button id="game-leave" type="button">나가기 · AI로 대체</button></div></div>
+      <div class="game-top"><div><p class="eyebrow">THE CAPTAIN’S TABLE</p><h2 id="round-title"></h2></div><div class="game-tools"><span id="game-code"></span><strong id="turn-timer" aria-label="남은 시간"></strong><button id="game-rulebook-open" type="button">룰북</button><button id="game-leave" type="button" aria-label="게임 나가기 · AI로 대체">나가기</button></div></div>
+      <p class="landscape-hint"><span aria-hidden="true">↻</span> 휴대전화를 가로로 돌리시면 원탁과 카드를 더 크게 보실 수 있습니다.</p>
       <div class="game-status"><span id="phase-badge" class="phase-badge"></span><h3 id="phase-title" aria-live="polite"></h3><p id="phase-help"></p></div>
       <div id="round-table" class="round-table" aria-label="고정 좌석 원탁 · 시계 방향 진행">
         <div id="table-drop-zone" class="battlefield" aria-label="카드를 놓아 제출하는 테이블">
@@ -49,7 +50,7 @@
           <div class="table-center"><span class="direction-symbol" aria-hidden="true">↻</span><strong>시계 방향</strong><small id="drop-hint">내 차례에 카드를 끌어 놓으세요</small></div>
         </div>
         <svg class="direction-ring" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="clockwise-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z"/></marker></defs><path d="M28 12 A44 44 0 0 1 91 66 M72 88 A44 44 0 0 1 9 34" marker-end="url(#clockwise-arrow)"/></svg>
-        <div id="scoreboard" class="scoreboard" aria-label="시계 방향 좌석과 플레이어 점수"></div>
+        <div id="scoreboard" class="scoreboard" aria-label="시계 방향 좌석과 닉네임"></div>
         <div id="trick-area" class="trick-area" aria-label="각 플레이어가 낸 카드"></div>
         <div id="table-countdown" class="table-countdown" aria-hidden="true" hidden><strong id="table-countdown-number"></strong><span id="table-countdown-label"></span></div>
       </div>
@@ -59,7 +60,7 @@
       <div id="hand-area"><div class="hand-heading"><h3>나의 손패 <small>YOUR HAND</small></h3><span id="hand-count"></span></div><div id="hand" class="hand" aria-label="내 손패"></div><div class="hand-dock"><div id="card-inspect" class="card-inspect" aria-live="polite">카드를 선택해 자세히 살펴보세요.</div><div id="play-controls" class="play-controls"><label id="tigress-choice" hidden>티그리스 사용 방식<select id="tigress-mode" aria-label="티그리스 사용 방식"><option value="pirate">해적으로 사용</option><option value="escape">도망으로 사용</option></select></label><button id="play-submit" class="primary" type="button">카드를 선택해 주세요</button></div></div></div>
       <div id="round-results" hidden><h3 id="result-title"></h3><div class="score-table-wrap"><table class="score-table"><thead><tr><th>참가자</th><th>예측 / 획득</th><th>기본</th><th>보너스</th><th>이번 점수</th><th>누적</th></tr></thead><tbody id="result-rows"></tbody></table></div><p id="round-auto-timer" class="round-auto-timer" role="timer" aria-live="off" hidden></p><p id="result-help"></p><button id="next-round" class="primary" type="button">다음 라운드</button><button id="return-lobby" class="primary" type="button">대기실에서 다시 하기</button></div>
       <p id="game-message" role="status" aria-live="polite"></p>
-      <details class="rule-guide"><summary>플레이 방법과 카드 규칙</summary><p>손패를 보고 이길 횟수를 예측한 뒤, 내 차례에 카드를 원탁 위로 끌어 놓거나, 선택한 뒤 내기를 누르세요. 선택한 카드를 다시 누르면 선택이 취소됩니다. 모두 제출한 예측만 공개합니다. 숫자 카드를 낼 때는 먼저 나온 색이 손패에 있으면 같은 색을 따라야 합니다. 특수 카드는 언제든 낼 수 있습니다.</p><p>검정은 다른 숫자 색보다 강합니다. 해적은 인어를, 스컬킹은 해적을, 인어는 스컬킹을 이깁니다. 세 종류가 함께 나오면 인어가 이깁니다. 티그리스는 낼 때 해적 또는 도망을 선택합니다. 모두 도망이면 먼저 낸 사람이 이깁니다.</p><p>예측 적중 시 1회당 20점, 실패 시 차이 1회당 -10점입니다. 0 예측은 배분 장수 × ±10점입니다. 14 카드와 특수 카드 포획 보너스는 예측이 맞아야 받습니다. 8명은 9·10라운드도 8장씩 배분하며, 10라운드 후 공동 1위면 연장합니다. 예측은 20초, 카드 제출은 내 차례마다 15초이며 시간이 지나면 자동으로 진행합니다.</p><button id="game-rulebook-open" type="button">예시와 함께 자세한 룰북 읽기</button></details>
+      <details class="rule-guide"><summary>플레이 방법과 카드 규칙</summary><p>손패를 보고 이길 횟수를 예측한 뒤, 내 차례에 카드를 원탁 위로 끌어 놓거나, 선택한 뒤 내기를 누르세요. 선택한 카드를 다시 누르면 선택이 취소됩니다. 모두 제출한 예측만 공개합니다. 숫자 카드를 낼 때는 먼저 나온 색이 손패에 있으면 같은 색을 따라야 합니다. 특수 카드는 언제든 낼 수 있습니다.</p><p>검정은 다른 숫자 색보다 강합니다. 해적은 인어를, 스컬킹은 해적을, 인어는 스컬킹을 이깁니다. 세 종류가 함께 나오면 인어가 이깁니다. 티그리스는 낼 때 해적 또는 도망을 선택합니다. 모두 도망이면 먼저 낸 사람이 이깁니다.</p><p>예측 적중 시 1회당 20점, 실패 시 차이 1회당 -10점입니다. 0 예측은 배분 장수 × ±10점입니다. 14 카드와 특수 카드 포획 보너스는 예측이 맞아야 받습니다. 8명은 9·10라운드도 8장씩 배분하며, 10라운드 후 공동 1위면 연장합니다. 예측은 20초, 카드 제출은 내 차례마다 15초이며 시간이 지나면 자동으로 진행합니다.</p></details>
     </section>
     <dialog id="rulebook" aria-labelledby="rulebook-title">
       <div class="rulebook-header"><div><p class="eyebrow">처음 하는 분을 위한 3분 안내</p><h2 id="rulebook-title">스컬킹 룰북</h2></div><button id="rulebook-close" type="button" aria-label="룰북 닫기" autofocus>닫기 ✕</button></div>
