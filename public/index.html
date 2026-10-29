@@ -59,6 +59,28 @@
       <div class="rulebook-header"><div><p class="eyebrow">처음 하는 분을 위한 3분 안내</p><h2 id="rulebook-title">스컬킹 룰북</h2></div><button id="rulebook-close" type="button" aria-label="룰북 닫기" autofocus>닫기 ✕</button></div>
       <div class="rulebook-content">
         <section class="rulebook-goal"><h3>목표는 딱 하나입니다.</h3><p><strong>이번 라운드에 이길 횟수를 미리 정하고, 그 횟수를 정확히 맞추세요.</strong> 예측을 맞혀 점수를 모으고, 10라운드 후 가장 높은 점수를 얻으면 우승합니다.</p><p class="rulebook-example">예: “이번에는 1번 이길 것 같아요.” → 실제로 딱 1번 이기면 성공입니다. 0번이나 2번 이기면 실패합니다.</p></section>
+        <section aria-labelledby="rulebook-deck-title">
+          <h3 id="rulebook-deck-title">카드는 총 몇 장인가요?</h3>
+          <p>현재 기본 모드는 <strong>총 70장 = 숫자 카드 56장 + 특수 카드 14장</strong>으로 진행합니다.</p>
+          <div class="rulebook-table-wrap"><table>
+            <caption>기본 모드 카드 구성과 숫자</caption>
+            <thead><tr><th scope="col">카드 종류</th><th scope="col">숫자 / 구성</th><th scope="col">장수</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">초록 숫자</th><td>1~14, 숫자마다 1장</td><td>14장</td></tr>
+              <tr><th scope="row">노랑 숫자</th><td>1~14, 숫자마다 1장</td><td>14장</td></tr>
+              <tr><th scope="row">보라 숫자</th><td>1~14, 숫자마다 1장</td><td>14장</td></tr>
+              <tr><th scope="row">검정 숫자</th><td>1~14, 숫자마다 1장</td><td>14장</td></tr>
+              <tr><th scope="row">도망</th><td>숫자 없음</td><td>5장</td></tr>
+              <tr><th scope="row">해적</th><td>숫자 없음</td><td>5장</td></tr>
+              <tr><th scope="row">인어</th><td>숫자 없음</td><td>2장</td></tr>
+              <tr><th scope="row">티그리스</th><td>해적 또는 도망으로 사용</td><td>1장</td></tr>
+              <tr><th scope="row">스컬킹</th><td>숫자 없음</td><td>1장</td></tr>
+            </tbody>
+            <tfoot><tr><th scope="row">합계</th><td>숫자 56장 + 특수 14장</td><td><strong>70장</strong></td></tr></tfoot>
+          </table></div>
+          <p><strong>숫자는 1부터 14까지이며, 0 카드는 없습니다.</strong> 같은 숫자는 색마다 한 장씩, 전체 덱에 총 4장입니다. 예를 들어 7은 초록·노랑·보라·검정에 각각 한 장씩 있습니다. 특수 카드에는 숫자가 없습니다.</p>
+          <p class="rulebook-note">이 표는 현재 온라인 기본 모드에서 사용하는 카드만 셉니다. 크라켄·흰고래·전리품 같은 확장 카드와 실물 제품의 안내 카드는 포함하지 않습니다.</p>
+        </section>
         <section><h3><span>01</span> 작은 승부와 큰 묶음을 구분해요</h3><dl class="rulebook-terms"><div><dt>손패</dt><dd>내가 받은 카드입니다. 나에게만 보입니다.</dd></div><div><dt>트릭</dt><dd>모두가 차례대로 카드 한 장씩 내는 작은 승부입니다. 가장 강한 카드를 낸 한 사람이 그 트릭을 가져가며, 이긴 횟수가 1 올라갑니다.</dd></div><div><dt>라운드</dt><dd>받은 카드를 전부 사용할 때까지의 묶음입니다. 3라운드에는 각자 3장을 받아 트릭을 3번 진행합니다.</dd></div></dl></section>
         <section><h3><span>02</span> 화면에서는 이렇게 시작하세요</h3><ol><li>이름을 입력하고 <strong>새로운 방 만들기</strong>를 누릅니다. 초대받았다면 방 코드를 입력해 참가합니다.</li><li>혼자라면 <strong>AI와 바로 시작</strong>을 누르세요. AI를 채워 총 4명으로 시작합니다.</li><li>이미 3명 이상 모였다면 다른 사람이 준비한 후 방장이 <strong>게임 시작</strong>을 누릅니다. 방장은 준비 버튼을 따로 누르지 않아도 됩니다.</li></ol><p class="rulebook-note">현재 기본 모드는 AI를 포함해 3~8명입니다. 2인 전용 규칙과 확장 카드는 포함하지 않습니다.</p></section>
         <section><h3><span>03</span> 카드를 보고 이길 횟수를 예측해요 <b>20초</b></h3><p>손패를 보고 이번 라운드에 몇 트릭을 이길지 <strong>0부터 손패 장수 사이</strong>로 입력한 뒤 <strong>예측 확정</strong>을 누르세요. 모두가 제출하면 한꺼번에 공개하며, 제출한 값은 바꿀 수 없습니다.</p><p class="rulebook-example">3장을 받았다면 0·1·2·3 중 하나를 선택합니다. 1을 예측했다면 3번의 트릭 중 딱 1번을 이기는 것이 목표입니다.</p><p>1라운드는 1장, 2라운드는 2장으로 늘어나 10라운드까지 진행합니다. 8명일 때는 9·10라운드도 8장씩 받습니다.</p></section>
