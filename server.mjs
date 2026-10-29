@@ -60,6 +60,8 @@ export function createApp() {
         if (path === '/api/rooms') return json(201, lobby.create(body.name));
         if (path === '/api/join') return json(200, lobby.join(body.code, body.name));
         const token = request.headers.authorization?.replace(/^Bearer /, '');
+        if (path === '/api/bots/add') return json(200, lobby.addBot(token));
+        if (path === '/api/bots/remove') return json(200, lobby.removeBot(token, body.playerId));
         if (path === '/api/ready') return json(200, lobby.ready(token, body.ready));
         if (path === '/api/leave') { lobby.leave(token); return json(200, { ok: true }); }
       }

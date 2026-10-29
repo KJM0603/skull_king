@@ -31,7 +31,7 @@ export class Lobby {
   }
 
   enter(room, name) {
-    const player = { id: randomUUID(), name, ready: false };
+    const player = { id: randomUUID(), name, ready: false, isBot: false };
     const token = randomBytes(32).toString('hex');
     room.players.push(player);
     room.hostId ??= player.id;
@@ -64,11 +64,39 @@ export class Lobby {
     return this.state(token);
   }
 
+  hostSession(token) {
+    const session = this.session(token);
+    if (session.room.hostId !== session.player.id) {
+      const error = new Error('AI 플레이어 관리는 방장만 할 수 있습니다.');
+      error.status = 403;
+      throw error;
+    }
+    return session;
+  }
+
+  addBot(token) {
+    const { room } = this.hostSession(token);
+    if (room.players.length >= 8) throw new Error('방의 정원은 AI를 포함해 8명입니다.');
+    let number = 1;
+    while (room.players.some(player => player.name === `AI 선원 ${number}`)) number++;
+    room.players.push({ id: randomUUID(), name: `AI 선원 ${number}`, ready: true, isBot: true });
+    return this.state(token);
+  }
+
+  removeBot(token, playerId) {
+    const { room } = this.hostSession(token);
+    const bot = room.players.find(player => player.id === playerId && player.isBot);
+    if (!bot) throw new Error('삭제할 AI 플레이어를 찾을 수 없습니다.');
+    room.players = room.players.filter(player => player.id !== bot.id);
+    return this.state(token);
+  }
+
   leave(token) {
     const { room, player } = this.session(token);
     room.players = room.players.filter(value => value.id !== player.id);
     this.sessions.delete(token);
-    if (room.players.length === 0) this.rooms.delete(room.code);
-    else if (room.hostId === player.id) room.hostId = room.players[0].id;
+    const humans = room.players.filter(value => !value.isBot);
+    if (humans.length === 0) this.rooms.delete(room.code);
+    else if (room.hostId === player.id) room.hostId = humans[0].id;
   }
 }

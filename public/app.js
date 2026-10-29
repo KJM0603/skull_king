@@ -3,7 +3,7 @@ const storageKey = 'skull-king-session';
 let token = sessionStorage.getItem(storageKey);
 let state = null;
 let busy = false;
-let lastPlayers = '';
+const playerRows = new Map();
 const invitedCode = new URL(location.href).searchParams.get('room');
 if (invitedCode) $('code').value = invitedCode.slice(0, 6).toUpperCase();
 
@@ -27,36 +27,58 @@ function show(next) {
   state = next;
   $('entry').hidden = Boolean(next);
   $('room').hidden = !next;
-  if (!next) { lastPlayers = ''; return; }
+  if (!next) { playerRows.clear(); $('players').replaceChildren(); return; }
   $('room-code').textContent = next.code;
   $('count').textContent = `${next.players.length} / ${next.capacity}명 · 준비 ${next.players.filter(player => player.ready).length}명`;
-  const signature = JSON.stringify([next.players, next.hostId, next.selfId]);
-  if (signature !== lastPlayers) {
-    lastPlayers = signature;
-    const rows = next.players.map(player => {
+  for (const [id, record] of playerRows) {
+    if (!next.players.some(player => player.id === id)) { record.row.remove(); playerRows.delete(id); }
+  }
+  for (const player of next.players) {
+    let record = playerRows.get(player.id);
+    if (!record) {
       const row = document.createElement('li');
       const name = document.createElement('span');
-      name.textContent = `${player.name}${player.id === next.selfId ? ' (나)' : ''}${player.id === next.hostId ? ' · 방장' : ''}`;
+      name.className = 'player-name';
+      const details = document.createElement('div');
+      details.className = 'player-details';
       const status = document.createElement('small');
-      status.textContent = player.ready ? '준비 완료' : '대기 중';
-      row.append(name, status);
-      return row;
-    });
-    $('players').replaceChildren(...rows);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'remove-bot';
+      remove.dataset.botId = player.id;
+      remove.textContent = '삭제';
+      details.append(status, remove);
+      row.append(name, details);
+      record = { row, name, status, remove };
+      playerRows.set(player.id, record);
+      $('players').append(row);
+    }
+    record.name.textContent = `${player.name}${player.isBot ? ' · AI' : ''}${player.id === next.selfId ? ' (나)' : ''}${player.id === next.hostId ? ' · 방장' : ''}`;
+    record.status.textContent = player.ready ? '준비 완료' : '대기 중';
+    record.remove.hidden = !player.isBot || next.selfId !== next.hostId;
+    record.remove.setAttribute('aria-label', `${player.name} 삭제`);
   }
+  $('ai-controls').hidden = next.selfId !== next.hostId;
+  $('ai-capacity').textContent = next.players.length >= next.capacity ? '정원이 가득 찼습니다.' : `AI 포함 최대 ${next.capacity}명`;
   $('ready').textContent = next.players.find(player => player.id === next.selfId)?.ready ? '준비 취소' : '준비하기';
+  syncControls();
+}
+
+function syncControls() {
+  document.querySelectorAll('button').forEach(button => { button.disabled = busy; });
+  $('add-bot').disabled = busy || !state || state.selfId !== state.hostId || state.players.length >= state.capacity;
 }
 
 async function action(work) {
   if (busy) return;
   busy = true;
-  document.querySelectorAll('button').forEach(button => { button.disabled = true; });
+  syncControls();
   $('message').textContent = '';
   try { await work(); }
   catch (error) { $('message').textContent = error.name === 'TimeoutError' ? '응답이 지연되고 있습니다. 다시 시도해 주세요.' : error.message; }
   finally {
     busy = false;
-    document.querySelectorAll('button').forEach(button => { button.disabled = false; });
+    syncControls();
   }
 }
 
@@ -68,6 +90,13 @@ async function enter(path) {
 }
 $('create').addEventListener('click', () => action(() => enter('rooms')));
 $('join-form').addEventListener('submit', event => { event.preventDefault(); action(() => enter('join')); });
+$('add-bot').addEventListener('click', () => action(async () => {
+  show(await api('bots/add', {}));
+}));
+$('players').addEventListener('click', event => {
+  const remove = event.target.closest('button[data-bot-id]');
+  if (remove) action(async () => { show(await api('bots/remove', { playerId: remove.dataset.botId })); });
+});
 $('ready').addEventListener('click', () => action(async () => {
   const self = state.players.find(player => player.id === state.selfId);
   show(await api('ready', { ready: !self.ready }));
