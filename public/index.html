@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102b2b">
+  <title>Skull King · 온라인 대기실</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <main>
+    <header><span class="brand">SK / 01</span><span class="edition">친구들과 함께하는 카드 항해</span></header>
+    <section class="intro">
+      <p class="eyebrow">GATHER YOUR CREW</p>
+      <h1>다음 한 수를,<br>함께.</h1>
+      <p class="lead">스컬킹 온라인 프로젝트의 첫 항해.<br>방을 만들고, 친구들을 초대해 주세요.</p>
+      <div class="deck" aria-hidden="true"><span>♧<b>7</b></span><span>♤<b>14</b></span><span>⚑<b>K</b></span></div>
+      <p class="stage">개발 1단계 · 대기실</p>
+    </section>
+    <section class="panel" aria-label="온라인 대기실">
+      <div id="entry">
+        <p class="eyebrow">WELCOME ABOARD</p><h2>선원을 모아볼까요?</h2>
+        <label for="name">플레이어 이름</label>
+        <input id="name" maxlength="20" autocomplete="nickname" placeholder="사용하실 이름을 입력해 주세요">
+        <button id="create" class="primary" type="button">새로운 방 만들기 <span>↗</span></button>
+        <div class="divider">초대받으셨나요?</div>
+        <form id="join-form"><label for="code">방 코드</label><div class="join-row"><input id="code" maxlength="6" autocomplete="off" placeholder="6자리 코드"><button type="submit">참가하기</button></div></form>
+      </div>
+      <div id="room" hidden>
+        <p class="eyebrow">YOUR CREW</p><h2>출항 대기실</h2>
+        <div class="room-code"><div><small>방 코드</small><strong id="room-code"></strong></div><button id="copy" type="button">초대 링크 복사</button></div>
+        <p id="count"></p><ul id="players" aria-label="참가자 목록"></ul>
+        <div class="actions"><button id="ready" class="primary" type="button">준비하기</button><button id="leave" type="button">나가기</button></div>
+        <p class="note">현재는 방 생성·참가·준비 기능을 이용하실 수 있습니다. 카드 게임 진행은 다음 개발 단계에 추가됩니다.</p>
+      </div>
+      <p id="message" role="status" aria-live="polite"></p>
+    </section>
+    <footer><span>SKULL KING / ONLINE PROTOTYPE</span><span>나의 손패는 나에게만, 진행은 모두에게.</span></footer>
+  </main>
+</body>
+</html>
