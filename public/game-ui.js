@@ -56,11 +56,18 @@ export function configureGameUI(submit) {
 function updateBidOptions() {
   for (const button of $('bid-options').children) button.setAttribute('aria-pressed', String(button.dataset.bid === $('bid-value').value));
 }
-function updateTimer() {
-  const game = state?.game;
-  const seconds = game?.deadlineAt ? Math.max(0, Math.ceil((game.deadlineAt - Date.now()) / 1000)) : null;
-  $('turn-timer').textContent = seconds === null ? '—' : `${seconds}초`;
+export function updateTimer(now = Date.now(), game = state?.game) {
+  const seconds = game?.deadlineAt ? Math.max(0, Math.ceil((game.deadlineAt - now) / 1000)) : null;
+  setText('turn-timer', seconds === null ? '—' : `${seconds}초`);
   $('turn-timer').classList.toggle('urgent', seconds !== null && seconds <= 5);
+  const active = ['bidding', 'playing'].includes(game?.phase);
+  const visible = active && seconds !== null && seconds > 0 && seconds <= 5;
+  $('table-countdown').hidden = !visible;
+  if (visible) {
+    setText('table-countdown-number', String(seconds));
+    const name = game.turnId ? state?.players.find(player => player.id === game.turnId)?.name : null;
+    setText('table-countdown-label', game.phase === 'bidding' ? '예측 마감' : name ? `${name}님 차례` : '카드 제출 마감');
+  }
 }
 function stamp() { return { gameId: state.game.id, round: state.game.round }; }
 function playerName(id) { return state.players.find(player => player.id === id)?.name ?? '참가자'; }
@@ -95,6 +102,7 @@ function updateSelection() {
 }
 export function renderGame(next, busy) {
   state = next;
+  updateTimer();
   const game = next?.game;
   $('game').hidden = !game;
   document.querySelector('main').classList.toggle('is-playing', Boolean(game));
