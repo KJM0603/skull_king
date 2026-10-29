@@ -87,10 +87,12 @@ export function renderGame(next, busy) {
     row.children[2].textContent = game.phase === 'bidding' ? info.hasBid ? '예측 제출 완료' : '예측 중' : `예측 ${info.bid} / 획득 ${info.won} · ${info.cardCount}장`;
   }
   const own = game.players.find(player => player.id === next.selfId);
+  const limits = game.timeLimits ?? { bidSeconds: 45, playSeconds: 45 };
   const myTurn = game.phase === 'playing' && game.turnId === next.selfId;
   const resultPhase = ['round-result', 'finished'].includes(game.phase);
   $('phase-title').textContent = game.phase === 'bidding' ? own.hasBid ? '다른 참가자의 예측을 기다립니다' : '이길 횟수를 예측해 주세요' : game.phase === 'playing' ? myTurn ? '내 차례입니다' : `${playerName(game.turnId)}님의 차례` : game.phase === 'trick-result' ? `${playerName(game.lastTrick.winnerId)}님이 트릭을 가져갑니다` : game.phase === 'finished' ? `${playerName(game.leaderIds[0])}님 우승!` : `${game.round}라운드 결과`;
   $('phase-help').textContent = game.phase === 'bidding' ? `${game.submittedCount} / ${next.players.length}명 제출 · 모두 제출하면 동시에 공개합니다.` : game.phase === 'playing' ? game.leadSuit ? `${suits[game.leadSuit]} 숫자 카드가 있으면 같은 색 또는 특수 카드를 내세요.` : '먼저 나온 숫자 색이 없습니다. 원하는 카드를 선택하세요.' : resultPhase ? game.phase === 'finished' ? '10라운드 이상의 합산 점수로 우승자를 결정했습니다.' : game.round >= 10 ? '공동 1위가 있어 연장 라운드를 진행합니다.' : '예측이 맞아야 보너스 점수를 받을 수 있습니다.' : '잠시 후 다음 트릭으로 진행합니다.';
+  if (game.phase === 'playing') $('phase-help').textContent += ` 카드 제출 제한은 ${limits.playSeconds}초입니다.`;
   const trickKey = JSON.stringify([game.id, game.round, game.trickNumber, game.trick]);
   if (trickSignature !== trickKey) {
     trickSignature = trickKey;
@@ -106,7 +108,7 @@ export function renderGame(next, busy) {
   $('last-trick').textContent = game.lastTrick ? `트릭 ${game.lastTrick.number}: ${playerName(game.lastTrick.winnerId)}님 획득 · 보너스 후보 ${game.lastTrick.bonus}점` : '';
   $('bid-form').hidden = game.phase !== 'bidding';
   $('bid-value').max = game.cardsDealt;
-  $('bid-help').textContent = own.hasBid ? `내 예측: ${game.ownBid}회${game.ownAutoBid ? ' (시간 만료로 자동 제출)' : ''} · 제출 후에는 바꿀 수 없습니다.` : `0~${game.cardsDealt}회로 입력해 주세요. 45초 후 자동 제출합니다.`;
+  $('bid-help').textContent = own.hasBid ? `내 예측: ${game.ownBid}회${game.ownAutoBid ? ' (시간 만료로 자동 제출)' : ''} · 제출 후에는 바꿀 수 없습니다.` : `0~${game.cardsDealt}회로 입력해 주세요. ${limits.bidSeconds}초 후 자동 제출합니다.`;
   const handKey = JSON.stringify([game.id, game.round, game.hand]);
   if (handSignature !== handKey) {
     handSignature = handKey;

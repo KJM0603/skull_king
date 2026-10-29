@@ -27,6 +27,7 @@ test('실제 HTTP: 시작 권한·비공개 예측·잘못된 제출·전체 게
   assert.equal(started.value.phase, 'bidding');
   assert.equal(started.value.players.length, 4);
   const first = started.value.game;
+  assert.deepEqual(first.timeLimits, { bidSeconds: 20, playSeconds: 15 });
   assert.equal(first.hand.length, 1);
   assert.equal('hands' in first, false);
   assert.ok(first.players.every(player => !('hand' in player)));
@@ -53,7 +54,8 @@ test('실제 HTTP: 시작 권한·비공개 예측·잘못된 제출·전체 게
   assert.equal((await call('game/play', host.token, { ...stamp(), trickNumber: 1, cardId: 'missing' })).status, 400);
 
   // Accelerate only the test-owned clock, without changing server APIs or exposing fixtures.
-  room.game.botMs = 0; room.game.resultMs = 0; room.game.actionMs = 1_000_000_000;
+  room.game.botMs = 0; room.game.resultMs = 0;
+  room.game.bidMs = 1_000_000_000; room.game.playMs = 1_000_000_000;
   const humanTokens = new Map([[host.state.selfId, host.token], [guest.state.selfId, guest.token]]);
   let steps = 0;
   while (room.game.phase !== 'finished' && steps++ < 8000) {

@@ -8,6 +8,10 @@ let actionRevision = 0;
 const playerRows = new Map();
 const invitedCode = new URL(location.href).searchParams.get('room');
 if (invitedCode) $('code').value = invitedCode.slice(0, 6).toUpperCase();
+for (const id of ['rulebook-open', 'game-rulebook-open']) {
+  $(id).addEventListener('click', () => { if (!$('rulebook').open) $('rulebook').showModal(); });
+}
+$('rulebook-close').addEventListener('click', () => $('rulebook').close());
 
 async function api(path, body) {
   const response = await fetch(`/api/${path}`, {

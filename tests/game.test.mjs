@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDeck, leadSuit, legalCards, resolveTrick, scoreRound, createGame, bid, play, advanceTrick, dealRound, gameView, chooseBid, choosePlay } from '../src/game.mjs';
+import { createDeck, leadSuit, legalCards, resolveTrick, scoreRound, createGame, bid, play, advanceTrick, dealRound, gameView, chooseBid, choosePlay, BID_TIMEOUT_MS, PLAY_TIMEOUT_MS } from '../src/game.mjs';
 import { Lobby } from '../src/lobby.mjs';
 
 const num = (suit, value) => ({ id: `${suit}-${value}`, type: 'number', suit, value });
@@ -140,4 +140,51 @@ test('10라운드 공동 1위는 연장하며 단독 1위에서 종료', () => {
   dealRound(game, 0);
   assert.equal(game.round, 11);
   assert.equal(game.cardsDealt, 10);
+});
+
+test('예측 20초와 카드 15초의 경계에서만 자동 제출', () => {
+  assert.equal(BID_TIMEOUT_MS, 20_000);
+  assert.equal(PLAY_TIMEOUT_MS, 15_000);
+  const lobby = new Lobby();
+  const host = lobby.create('시간 검증');
+  const view = lobby.start(host.token, true, 1000);
+  assert.equal(view.game.deadlineAt, 21_000);
+  assert.deepEqual(view.game.timeLimits, { bidSeconds: 20, playSeconds: 15 });
+  const game = lobby.session(host.token).room.game;
+  lobby.tick(20_999);
+  assert.equal(game.phase, 'bidding');
+  assert.equal(Object.hasOwn(game.bids, host.state.selfId), false);
+  lobby.tick(21_000);
+  assert.equal(game.phase, 'playing');
+  assert.equal(game.autoBids[host.state.selfId], true);
+  assert.equal(game.deadlineAt, 36_000);
+  lobby.tick(35_999);
+  assert.equal(game.hands[host.state.selfId].length, 1);
+  lobby.tick(36_000);
+  assert.equal(game.hands[host.state.selfId].length, 0);
+  assert.equal(game.deadlineAt, 51_000);
+});
+
+test('각 참가자의 새 차례와 다음 트릭은 15초, 새 라운드 예측은 20초', () => {
+  const game = createGame([{ id: 'a' }, { id: 'b' }, { id: 'c' }], 0);
+  game.cardsDealt = 2;
+  game.hands = { a: [num('green', 1), num('green', 2)], b: [num('green', 3), num('green', 4)], c: [num('green', 5), num('green', 6)] };
+  bid(game, 'a', 0, 1000); bid(game, 'b', 0, 1000); bid(game, 'c', 0, 1000);
+  assert.equal(game.deadlineAt, 16_000);
+  play(game, 'a', 'green-1', null, 2000);
+  assert.equal(game.deadlineAt, 17_000);
+  play(game, 'b', 'green-3', null, 3000);
+  assert.equal(game.deadlineAt, 18_000);
+  play(game, 'c', 'green-5', null, 4000);
+  assert.equal(game.deadlineAt, null);
+  advanceTrick(game, 5800);
+  assert.equal(game.turnId, 'c');
+  assert.equal(game.deadlineAt, 20_800);
+  play(game, 'c', 'green-6', null, 6000);
+  play(game, 'a', 'green-2', null, 7000);
+  play(game, 'b', 'green-4', null, 8000);
+  advanceTrick(game, 9800);
+  assert.equal(game.phase, 'round-result');
+  dealRound(game, 10_000);
+  assert.equal(game.deadlineAt, 30_000);
 });

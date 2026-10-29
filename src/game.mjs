@@ -1,6 +1,8 @@
 import { randomInt, randomUUID } from 'node:crypto';
 
 export const SUITS = ['green', 'yellow', 'purple', 'black'];
+export const BID_TIMEOUT_MS = 20_000;
+export const PLAY_TIMEOUT_MS = 15_000;
 export function createDeck() {
   const deck = SUITS.flatMap(suit => Array.from({ length: 14 }, (_, index) => ({ id: `${suit}-${index + 1}`, type: 'number', suit, value: index + 1 })));
   for (const [type, count] of [['escape', 5], ['pirate', 5], ['mermaid', 2], ['king', 1], ['tigress', 1]]) {
@@ -58,7 +60,7 @@ export function createGame(players, now = Date.now()) {
   const game = {
     id: randomUUID(), players: players.map(player => player.id), round: 0,
     scores: Object.fromEntries(players.map(player => [player.id, 0])), history: [],
-    actionMs: 45_000, botMs: 650, resultMs: 1800,
+    bidMs: BID_TIMEOUT_MS, playMs: PLAY_TIMEOUT_MS, botMs: 650, resultMs: 1800,
   };
   dealRound(game, now);
   return game;
@@ -78,7 +80,7 @@ export function dealRound(game, now) {
   game.trickNumber = 1;
   game.trick = [];
   game.lastTrick = null;
-  game.deadlineAt = now + game.actionMs;
+  game.deadlineAt = now + game.bidMs;
   game.autoAt = now + game.botMs;
 }
 export function bid(game, playerId, value, now, automatic = false) {
@@ -91,7 +93,7 @@ export function bid(game, playerId, value, now, automatic = false) {
   if (Object.keys(game.bids).length === game.players.length) {
     game.phase = 'playing';
     game.turnId = game.roundStarter;
-    game.deadlineAt = now + game.actionMs;
+    game.deadlineAt = now + game.playMs;
     game.autoAt = now + game.botMs;
   }
 }
@@ -115,7 +117,7 @@ export function play(game, playerId, cardId, mode, now) {
     game.autoAt = now + game.resultMs;
   } else {
     game.turnId = game.players[(game.players.indexOf(playerId) + 1) % game.players.length];
-    game.deadlineAt = now + game.actionMs;
+    game.deadlineAt = now + game.playMs;
     game.autoAt = now + game.botMs;
   }
 }
@@ -138,7 +140,7 @@ export function advanceTrick(game, now) {
     game.trick = [];
     game.phase = 'playing';
     game.turnId = game.lastTrick.winnerId;
-    game.deadlineAt = now + game.actionMs;
+    game.deadlineAt = now + game.playMs;
     game.autoAt = now + game.botMs;
   }
 }
@@ -163,6 +165,7 @@ export function gameView(game, playerId) {
     id: game.id, phase: game.phase, round: game.round, cardsDealt: game.cardsDealt, totalRounds: 10,
     turnId: game.turnId, trickNumber: game.trickNumber, leadSuit: leadSuit(game.trick),
     deadlineAt: game.deadlineAt, submittedCount: Object.keys(game.bids).length,
+    timeLimits: { bidSeconds: game.bidMs / 1000, playSeconds: game.playMs / 1000 },
     ownBid: game.bids[playerId] ?? null, ownAutoBid: Boolean(game.autoBids[playerId]),
     hand: game.hands[playerId].map(card => ({ ...card })),
     playableCardIds: game.phase === 'playing' && game.turnId === playerId ? legalCards(game.hands[playerId], game.trick).map(card => card.id) : [],
