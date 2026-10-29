@@ -1,8 +1,13 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import { createGame, dealRound, bid, play, advanceTrick, chooseBid, choosePlay, gameView } from './game.mjs';
 
 export class Lobby {
   rooms = new Map();
   sessions = new Map();
+
+  ensureLobby(room) {
+    if (room.game) throw new Error('게임 진행 중에는 참가자 구성을 바꿀 수 없습니다.');
+  }
 
   name(value) {
     if (typeof value !== 'string' || !value.trim() || value.trim().length > 20) {
@@ -25,6 +30,7 @@ export class Lobby {
     name = this.name(name);
     const room = this.rooms.get(String(code ?? '').trim().toUpperCase());
     if (!room) throw new Error('방을 찾을 수 없습니다. 방 코드를 확인해 주세요.');
+    this.ensureLobby(room);
     if (room.players.length >= 8) throw new Error('방의 정원은 8명입니다.');
     if (room.players.some(player => player.name === name)) throw new Error('이미 사용 중인 이름입니다.');
     return this.enter(room, name);
@@ -53,13 +59,15 @@ export class Lobby {
     const { room, player } = this.session(token);
     return {
       code: room.code, hostId: room.hostId, selfId: player.id,
-      phase: 'lobby', capacity: 8,
+      phase: room.game?.phase ?? 'lobby', capacity: 8,
       players: room.players.map(value => ({ ...value })),
+      game: room.game ? gameView(room.game, player.id) : null,
     };
   }
 
   ready(token, ready) {
     if (typeof ready !== 'boolean') throw new Error('준비 상태가 올바르지 않습니다.');
+    this.ensureLobby(this.session(token).room);
     this.session(token).player.ready = ready;
     return this.state(token);
   }
@@ -67,7 +75,7 @@ export class Lobby {
   hostSession(token) {
     const session = this.session(token);
     if (session.room.hostId !== session.player.id) {
-      const error = new Error('AI 플레이어 관리는 방장만 할 수 있습니다.');
+      const error = new Error('방장만 할 수 있는 작업입니다.');
       error.status = 403;
       throw error;
     }
@@ -76,6 +84,7 @@ export class Lobby {
 
   addBot(token) {
     const { room } = this.hostSession(token);
+    this.ensureLobby(room);
     if (room.players.length >= 8) throw new Error('방의 정원은 AI를 포함해 8명입니다.');
     let number = 1;
     while (room.players.some(player => player.name === `AI 선원 ${number}`)) number++;
@@ -85,15 +94,87 @@ export class Lobby {
 
   removeBot(token, playerId) {
     const { room } = this.hostSession(token);
+    this.ensureLobby(room);
     const bot = room.players.find(player => player.id === playerId && player.isBot);
     if (!bot) throw new Error('삭제할 AI 플레이어를 찾을 수 없습니다.');
     room.players = room.players.filter(player => player.id !== bot.id);
     return this.state(token);
   }
 
+  start(token, withBots = false, now = Date.now()) {
+    const { room, player } = this.hostSession(token);
+    this.ensureLobby(room);
+    if (room.players.some(value => value.id !== player.id && !value.ready)) throw new Error('다른 참가자가 모두 준비해야 시작할 수 있습니다.');
+    if (withBots === true) while (room.players.length < 4) this.addBot(token);
+    if (room.players.length < 3) throw new Error('AI를 추가해 총 3명 이상으로 시작해 주세요.');
+    room.game = createGame(room.players, now);
+    player.ready = true;
+    return this.state(token);
+  }
+
+  gameSession(token, input) {
+    const session = this.session(token);
+    const game = session.room.game;
+    if (!game || input.gameId !== game.id || input.round !== game.round) throw new Error('게임 상태가 변경되었습니다. 최신 화면에서 다시 시도해 주세요.');
+    return { ...session, game };
+  }
+
+  submitBid(token, input, now = Date.now()) {
+    const { game, player } = this.gameSession(token, input);
+    bid(game, player.id, input.bid, now);
+    return this.state(token);
+  }
+
+  playCard(token, input, now = Date.now()) {
+    const { game, player } = this.gameSession(token, input);
+    if (input.trickNumber !== game.trickNumber) throw new Error('다음 트릭으로 넘어갔습니다. 카드를 다시 선택해 주세요.');
+    play(game, player.id, input.cardId, input.mode, now);
+    return this.state(token);
+  }
+
+  nextRound(token, input, now = Date.now()) {
+    this.hostSession(token);
+    const { game } = this.gameSession(token, input);
+    if (game.phase !== 'round-result') throw new Error('아직 다음 라운드로 진행할 수 없습니다.');
+    dealRound(game, now);
+    return this.state(token);
+  }
+
+  returnToLobby(token, input) {
+    this.hostSession(token);
+    const { room, game } = this.gameSession(token, input);
+    if (game.phase !== 'finished') throw new Error('게임 종료 후 대기실로 돌아갈 수 있습니다.');
+    room.players = room.players.filter(player => !player.departed);
+    room.game = null;
+    room.players.forEach(player => { player.ready = player.isBot; });
+    return this.state(token);
+  }
+
+  tick(now = Date.now()) {
+    for (const room of this.rooms.values()) {
+      const game = room.game;
+      if (!game) continue;
+      if (game.phase === 'bidding') {
+        for (const player of room.players) {
+          if (Object.hasOwn(game.bids, player.id)) continue;
+          if ((player.isBot && now >= game.autoAt) || now >= game.deadlineAt) {
+            bid(game, player.id, chooseBid(game.hands[player.id]), now, !player.isBot);
+          }
+        }
+      } else if (game.phase === 'playing') {
+        const player = room.players.find(value => value.id === game.turnId);
+        if ((player.isBot && now >= game.autoAt) || now >= game.deadlineAt) {
+          const card = choosePlay(game.hands[player.id], game.trick, game.won[player.id] < game.bids[player.id]);
+          play(game, player.id, card.id, card.mode, now);
+        }
+      } else if (game.phase === 'trick-result' && now >= game.autoAt) advanceTrick(game, now);
+    }
+  }
+
   leave(token) {
     const { room, player } = this.session(token);
-    room.players = room.players.filter(value => value.id !== player.id);
+    if (room.game) { player.isBot = true; player.departed = true; player.ready = true; }
+    else room.players = room.players.filter(value => value.id !== player.id);
     this.sessions.delete(token);
     const humans = room.players.filter(value => !value.isBot);
     if (humans.length === 0) this.rooms.delete(room.code);
