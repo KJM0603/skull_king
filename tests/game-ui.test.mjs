@@ -44,7 +44,10 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
     };
     renderGame(state, false);
     const ownSeat = get('scoreboard').children.find(row => row.classList.contains('my-seat'));
+    const otherSeat = get('scoreboard').children.find(row => !row.classList.contains('my-seat'));
     assert.equal(ownSeat.dataset.seat, '2', 'server seat order takes precedence over lobby order');
+    assert.equal(otherSeat.children[1].children[0].textContent, '예측 —', 'other bids stay hidden until all players submit');
+    assert.equal(otherSeat.children[1].children[1].textContent, '획득 0');
     const ownPosition = [ownSeat.attributes['--seat-x'], ownSeat.attributes['--seat-y']];
     assert.equal(get('bid-options').children.length, 3);
     get('bid-options').fire('click', get('bid-options').children[2]);
@@ -67,11 +70,19 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
     get('bid-form').fire('submit');
     assert.deepEqual(requests.at(-1), { path: 'game/bid', body: { gameId: 'game1', round: 2, bid: 2 } });
     state.game.players[0].hasBid = true;
+    state.game.players[0].bid = 2;
+    state.game.ownBid = 2;
     renderGame(state, false);
+    assert.equal(ownSeat.children[1].children[0].textContent, '예측 2');
+    assert.equal(otherSeat.children[1].children[0].textContent, '예측 —');
+    assert.equal(get('scoreboard').children.find(row => row.classList.contains('my-seat')), ownSeat, 'bid progress does not replace seat nodes');
     assert.ok(get('bid-options').children.every(button => button.disabled));
 
     state.game.phase = 'playing'; state.game.turnId = 'me'; state.game.playableCardIds = ['t'];
+    state.game.players[1].bid = 0;
     renderGame(state, false);
+    assert.equal(otherSeat.children[1].children[0].textContent, '예측 0', 'zero is a public bid, not a missing bid');
+    assert.equal(ownSeat.children[1].children[0].textContent, '예측 2');
     assert.equal(get('play-submit').disabled, false);
     assert.ok(hand[0].classList.contains('playable'));
     assert.ok(hand[1].classList.contains('unplayable'));
@@ -93,7 +104,10 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
     assert.equal(slot.dataset.seat, '1', 'submitted card stays at its owner seat');
     assert.match(get('turn-order').textContent, /마지막 차례/);
     state.game.phase = 'trick-result'; state.game.lastTrick = { number: 1, winnerId: 'other', bonus: 10 };
+    state.game.players[1].won = 1;
     renderGame(state, false);
+    assert.equal(otherSeat.children[1].children[1].textContent, '획득 1', 'trick winner count updates on the same seat');
+    assert.equal(otherSeat.children[1].children[0].textContent, '예측 0');
     assert.equal(get('trick-area').children[0], slot, 'same trick nodes survive result transition');
     assert.ok(slot.classList.contains('winner'), 'winner updates even when trick cards did not change');
     assert.ok(get('play-submit').disabled);
@@ -136,8 +150,10 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
     assert.ok(get('round-auto-timer').hidden);
     assert.equal(get('result-rows').children, scoreRows);
     state.selfId = 'me';
-    state.game.round = 3; state.game.cardsDealt = 3; state.game.phase = 'bidding'; state.game.trick = []; state.game.players[0].hasBid = false;
+    state.game.round = 3; state.game.cardsDealt = 3; state.game.phase = 'bidding'; state.game.trick = []; state.game.players[0].hasBid = false; state.game.players[0].bid = null; state.game.players[1].bid = null; state.game.players[1].won = 0;
     renderGame(state, false);
+    assert.equal(otherSeat.children[1].children[0].textContent, '예측 —', 'new round hides previous bids');
+    assert.equal(otherSeat.children[1].children[1].textContent, '획득 0', 'new round resets trick count');
     assert.equal(get('bid-value').value, '0');
     assert.equal(get('tigress-mode').value, 'pirate');
     assert.equal(get('trick-area').children.length, 0);

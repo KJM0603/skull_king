@@ -70,7 +70,7 @@ function submitCard(cardId) {
   send('game/play', { ...stamp(), trickNumber: state.game.trickNumber, cardId, mode: $('tigress-mode').value });
 }
 function seats() { return state.game.seatOrder ?? state.game.players.map(player => player.id); }
-function positionAtSeat(element, playerId, cards = false) {
+function positionAtSeat(element, playerId) {
   const order = seats();
   const index = order.indexOf(playerId);
   const angle = -Math.PI / 2 + index * 2 * Math.PI / order.length;
@@ -81,7 +81,6 @@ function positionAtSeat(element, playerId, cards = false) {
   // Spread the two diagonal cards vertically on a shallow landscape table.
   element.style.setProperty('--wide-card-y', Math.sign(Math.sin(angle)) * Math.sqrt(Math.abs(Math.sin(angle))));
   element.dataset.seat = String(index + 1);
-  if (!cards) element.setAttribute('aria-label', `${index + 1}번 좌석 · ${playerName(playerId)}`);
 }
 function updateBidOptions() {
   for (const button of $('bid-options').children) button.setAttribute('aria-pressed', String(button.dataset.bid === $('bid-value').value));
@@ -164,12 +163,26 @@ export function renderGame(next, busy) {
     const info = game.players.find(value => value.id === player.id);
     if (!info) continue;
     let row = scoreboard.get(player.id);
-    if (!row) { row = document.createElement('div'); row.className = 'score-player'; row.append(document.createElement('strong')); scoreboard.set(player.id, row); $('scoreboard').append(row); }
+    if (!row) {
+      row = document.createElement('div'); row.className = 'score-player';
+      const progress = document.createElement('div'); progress.className = 'seat-progress';
+      const predicted = document.createElement('span'); predicted.className = 'seat-bid';
+      const won = document.createElement('span'); won.className = 'seat-won';
+      progress.append(predicted, won);
+      row.append(document.createElement('strong'), progress);
+      scoreboard.set(player.id, row); $('scoreboard').append(row);
+    }
     positionAtSeat(row, player.id);
     row.classList.toggle('my-seat', player.id === next.selfId);
     row.classList.toggle('active-seat', game.turnId === player.id);
     row.children[0].textContent = `${player.name}${player.id === next.selfId ? ' (나)' : ''}`;
-    row.setAttribute('title', `${player.name}${player.isBot ? ' · AI' : ''}`);
+    const visibleBid = game.phase !== 'bidding' || player.id === next.selfId ? info.bid : null;
+    const bidText = visibleBid === null ? '예측 —' : `예측 ${visibleBid}`;
+    const wonText = `획득 ${info.won}`;
+    if (row.children[1].children[0].textContent !== bidText) row.children[1].children[0].textContent = bidText;
+    if (row.children[1].children[1].textContent !== wonText) row.children[1].children[1].textContent = wonText;
+    row.setAttribute('aria-label', `${row.dataset.seat}번 좌석 · ${player.name}${player.id === next.selfId ? ' 본인' : ''} · ${visibleBid === null ? '예측 비공개' : `${bidText}회`} · ${wonText}회`);
+    row.setAttribute('title', `${player.name}${player.isBot ? ' · AI' : ''} · ${visibleBid === null ? '예측 비공개' : `${bidText}회`} · ${wonText}회`);
   }
   const own = game.players.find(player => player.id === next.selfId);
   const limits = game.timeLimits ?? { bidSeconds: 45, playSeconds: 45 };
@@ -204,7 +217,7 @@ export function renderGame(next, busy) {
       const label = document.createElement('span'); label.textContent = playerName(play.playerId);
       slot.append(label, cardElement(play.card));
       trickSlots.set(play.playerId, slot); $('trick-area').append(slot);
-      positionAtSeat(slot, play.playerId, true);
+      positionAtSeat(slot, play.playerId);
     }
     slot.classList.toggle('winner', game.phase === 'trick-result' && game.lastTrick?.winnerId === play.playerId);
   }

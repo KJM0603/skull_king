@@ -67,7 +67,9 @@ test('잘못된 카드/색/모드/중복 제출은 손패를 바꾸지 않고 �
   bid(game, 'a', 1, 0);
   assert.throws(() => bid(game, 'a', 0, 0));
   assert.equal(gameView(game, 'b').players.find(player => player.id === 'a').bid, null);
+  assert.equal(gameView(game, 'a').players.find(player => player.id === 'a').bid, 1);
   bid(game, 'b', 0, 0); bid(game, 'c', 1, 0);
+  assert.deepEqual(gameView(game, 'b').players.map(player => player.bid), [1, 0, 1]);
   assert.throws(() => play(game, 'b', 'green-2', null, 0));
   assert.throws(() => play(game, 'a', 'missing', null, 0));
   play(game, 'a', 'green-7', null, 0);
@@ -78,6 +80,11 @@ test('잘못된 카드/색/모드/중복 제출은 손패를 바꾸지 않고 �
   assert.equal(game.hands.c.length, 2);
   play(game, 'c', 'tigress', 'pirate', 0);
   assert.equal(game.lastTrick.winnerId, 'c');
+  for (const viewerId of ['a', 'b', 'c']) {
+    const view = gameView(game, viewerId);
+    assert.deepEqual(view.players.map(player => player.bid), [1, 0, 1]);
+    assert.deepEqual(view.players.map(player => player.won), [0, 0, 1]);
+  }
   advanceTrick(game, 2000);
   assert.equal(game.turnId, 'c');
 });

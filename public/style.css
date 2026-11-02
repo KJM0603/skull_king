@@ -111,3 +111,10 @@
  .game-status h3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:35vw}
 }
 .resume-panel{padding:0 0 16px;margin-bottom:16px;border-bottom:1px solid #ffffff20}.resume-panel .primary{width:100%}.resume-panel .note{line-height:1.6}
+
+/* Keep every published bid and the current trick count beside its owner. */
+.round-table .seat-progress{display:flex;flex-direction:column;align-items:center;gap:1px;width:100%;padding:3px 2px;border:1px solid #d7c58b45;border-radius:7px;background:#091f20e8;font-variant-numeric:tabular-nums}
+.round-table .seat-progress span{font:700 10px/1.25 system-ui,sans-serif;color:#f6e4b2;white-space:nowrap}
+.round-table .seat-progress .seat-won{color:#d3eee1}
+@media(max-width:850px){.round-table .seat-progress span{font-size:9px}}
+@media(orientation:portrait) and (max-width:850px), (orientation:landscape) and (max-height:600px) and (max-width:740px){.round-table .seat-progress{padding:2px 0}.round-table .seat-progress span{font-size:8px}}
