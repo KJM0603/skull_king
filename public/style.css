@@ -118,3 +118,5 @@
 .round-table .seat-progress .seat-won{color:#d3eee1}
 @media(max-width:850px){.round-table .seat-progress span{font-size:9px}}
 @media(orientation:portrait) and (max-width:850px), (orientation:landscape) and (max-height:600px) and (max-width:740px){.round-table .seat-progress{padding:2px 0}.round-table .seat-progress span{font-size:8px}}
+@media(orientation:portrait) and (max-width:850px){.game-panel{grid-template-columns:minmax(0,1fr)}.game-top,.game-status,.round-table,#hand-area{min-width:0}.game-top{flex-wrap:wrap}.game-top h2{margin:0}.round-table{width:100%;max-width:100%}}
+@media(orientation:portrait) and (min-width:360px) and (max-width:850px){.round-table .seat-progress span{font-size:10px}}
