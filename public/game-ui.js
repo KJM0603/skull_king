@@ -14,6 +14,7 @@ let roundSignature = '';
 let phaseSignature = '';
 let uiBusy = false;
 let drag;
+let handExpanded = false;
 const scoreboard = new Map();
 const trickSlots = new Map();
 const descriptions = { escape: '승부를 피해 가는 카드. 모두 도망이면 먼저 낸 사람이 이깁니다.', pirate: '숫자와 인어를 이기는 해적. 스컬킹을 조심하세요.', king: '모든 해적을 압도하는 스컬킹. 인어에게는 집니다.', mermaid: '스컬킹을 잡는 인어. 해적에게는 집니다.', tigress: '제출할 때 해적 또는 도망으로 사용할 수 있습니다.' };
@@ -28,9 +29,14 @@ const emblems = {
 };
 export function configureGameUI(submit) {
   send = submit;
+  $('hand-toggle').addEventListener('click', () => setHandExpanded(!handExpanded));
+  $('round-table').addEventListener('pointerdown', () => { if (handExpanded) setHandExpanded(false); });
+  $('hand-area').addEventListener('keydown', event => {
+    if (event.key === 'Escape' && handExpanded) { setHandExpanded(false); $('hand-toggle').focus(); }
+  });
   drag = configureCardDrag({ hand: $('hand'), zone: $('table-drop-zone'), canPlay,
     context: () => state?.game ? `${state.game.id}:${state.game.round}:${state.game.trickNumber}:${state.game.phase}:${state.game.turnId}:${state.game.deadlineAt}` : '',
-    pick: cardId => { selected = cardId; updateSelection(); syncGameControls(uiBusy); }, submit: submitCard });
+    pick: cardId => { selected = cardId; updateSelection(); syncGameControls(uiBusy); }, tap: selectCard, submit: submitCard });
   $('bid-form').addEventListener('submit', event => {
     event.preventDefault();
     if (state?.game) send('game/bid', { ...stamp(), bid: Number($('bid-value').value) });
@@ -39,9 +45,7 @@ export function configureGameUI(submit) {
     const button = event.target.closest('button[data-card-id]');
     if (!button || button.disabled) return;
     if (drag.consumeClick(button.dataset.cardId, event.detail)) return;
-    selected = selected === button.dataset.cardId ? null : button.dataset.cardId;
-    updateSelection();
-    syncGameControls(uiBusy);
+    selectCard(button.dataset.cardId);
   });
   $('bid-options').addEventListener('click', event => {
     const option = event.target.closest('button[data-bid]');
@@ -60,6 +64,23 @@ export function configureGameUI(submit) {
   });
   $('return-lobby').addEventListener('click', () => { if (state?.game) send('game/lobby', stamp()); });
   setInterval(updateTimer, 250);
+}
+function selectCard(cardId) {
+  selected = selected === cardId ? null : cardId;
+  updateSelection();
+  syncGameControls(uiBusy);
+}
+function setHandExpanded(expanded) {
+  drag?.cancel();
+  if (!expanded && ($('hand').contains?.(document.activeElement) || $('hand-dock').contains?.(document.activeElement))) $('hand-toggle').focus();
+  handExpanded = expanded;
+  $('hand-area').classList.toggle('hand-expanded', expanded);
+  $('hand-toggle').setAttribute('aria-expanded', String(expanded));
+  $('hand-toggle').setAttribute('aria-label', expanded ? '손패 접고 필드 보기' : `손패 ${state?.game?.hand.length ?? 0}장 펼치기`);
+  setText('hand-toggle-label', expanded ? '손패 접기 ↓' : '손패 펼치기 ↑');
+  $('hand').hidden = !expanded;
+  $('hand-dock').hidden = !expanded;
+  $('hand-preview').hidden = expanded;
 }
 function canPlay(cardId) {
   const game = state?.game;
@@ -142,12 +163,13 @@ export function renderGame(next, busy) {
   const game = next?.game;
   $('game').hidden = !game;
   document.querySelector('main').classList.toggle('is-playing', Boolean(game));
-  if (!game) { handSignature = ''; trickSignature = ''; resultSignature = ''; roundSignature = ''; phaseSignature = ''; selected = null; scoreboard.clear(); trickSlots.clear(); $('scoreboard').replaceChildren(); $('trick-area').replaceChildren(); return; }
+  if (!game) { setHandExpanded(false); handSignature = ''; trickSignature = ''; resultSignature = ''; roundSignature = ''; phaseSignature = ''; selected = null; scoreboard.clear(); trickSlots.clear(); $('scoreboard').replaceChildren(); $('trick-area').replaceChildren(); return; }
   const roundKey = `${game.id}:${game.round}`;
   if (roundSignature !== roundKey) {
     roundSignature = roundKey;
     $('bid-value').value = '0';
     selected = null;
+    setHandExpanded(false);
     $('tigress-mode').value = 'pirate';
     $('bid-options').replaceChildren(...Array.from({ length: game.cardsDealt + 1 }, (_, bid) => {
       const button = document.createElement('button'); button.type = 'button'; button.dataset.bid = String(bid); button.textContent = String(bid); button.setAttribute('aria-label', `${bid}회 예측`); return button;
@@ -230,9 +252,20 @@ export function renderGame(next, busy) {
   const handKey = JSON.stringify([game.id, game.round, game.hand]);
   if (handSignature !== handKey) {
     handSignature = handKey;
+    // Only a server-confirmed removal closes the hand; failed submissions keep it open.
+    if (selected && !game.hand.some(card => card.id === selected)) setHandExpanded(false);
     if (!game.hand.some(card => card.id === selected)) selected = null;
     $('hand').replaceChildren(...game.hand.map(card => cardElement(card, true)));
+    $('hand-preview').replaceChildren(...game.hand.map(card => {
+      const preview = document.createElement('span');
+      preview.className = `mini-card card-${card.suit ?? card.type}`;
+      preview.textContent = `${symbols[card.suit ?? card.type]}${card.type === 'number' ? card.value : ''}`;
+      return preview;
+    }));
+    $('hand-preview').style.setProperty('--preview-count', Math.max(1, game.hand.length));
+    $('hand-toggle').setAttribute('aria-label', handExpanded ? '손패 접고 필드 보기' : `손패 ${game.hand.length}장 펼치기`);
   }
+  if (resultPhase && handExpanded) setHandExpanded(false);
   $('hand-area').hidden = resultPhase;
   $('hand-count').textContent = `${game.hand.length}장 · 나에게만 보입니다`;
   $('play-controls').hidden = game.phase !== 'playing';
@@ -283,9 +316,9 @@ export function syncGameControls(busy) {
   $('return-lobby').disabled = busy || state.selfId !== state.hostId || game.phase !== 'finished';
 }
 
-// Pointer events support mouse, pen and an upward touch drag. Horizontal touch
-// movement remains the browser's native hand scrolling (touch-action: pan-x).
-export function configureCardDrag({ hand, zone, canPlay, context, pick, submit }) {
+// Own touch gestures inside the hand so browser panning cannot cancel a card drag.
+// Horizontal swipes scroll the hand; upward/diagonal gestures lift a card.
+export function configureCardDrag({ hand, zone, canPlay, context, pick, tap, submit }) {
   let gesture = null;
   let suppressClick = null;
   const hint = document.getElementById('drop-hint');
@@ -308,18 +341,24 @@ export function configureCardDrag({ hand, zone, canPlay, context, pick, submit }
   hand.addEventListener('pointerdown', event => {
     if (gesture || event.button !== 0 || event.isPrimary === false) return;
     const button = event.target.closest('button[data-card-id]');
-    if (!button || button.disabled || !canPlay(button.dataset.cardId)) return;
+    if (!button || button.disabled || (event.pointerType !== 'touch' && !canPlay(button.dataset.cardId))) return;
     suppressClick = null;
-    gesture = { button, cardId: button.dataset.cardId, pointerId: event.pointerId, type: event.pointerType, x: event.clientX, y: event.clientY, context: context(), ghost: null };
+    gesture = { button, cardId: button.dataset.cardId, pointerId: event.pointerId, type: event.pointerType, x: event.clientX, y: event.clientY, scrollLeft: hand.scrollLeft, scrolling: false, context: context(), ghost: null };
+    button.setPointerCapture(event.pointerId);
   });
   document.addEventListener('pointermove', event => {
     const g = gesture;
     if (!g || g.pointerId !== event.pointerId) return;
-    if (g.context !== context() || !canPlay(g.cardId)) { cancel(); return; }
+    if (g.context !== context() || (g.ghost && !canPlay(g.cardId))) { cancel(); return; }
     const dx = event.clientX - g.x, dy = event.clientY - g.y;
+    if (g.scrolling) { event.preventDefault(); hand.scrollLeft = g.scrollLeft - dx; return; }
     if (!g.ghost) {
-      if (Math.hypot(dx, dy) < 9) return;
-      if (g.type === 'touch' && (Math.abs(dx) > Math.abs(dy) || dy > 0)) { clean(); return; }
+      if (Math.hypot(dx, dy) < 12) return;
+      if (g.type === 'touch' && Math.abs(dx) > Math.abs(dy) * 1.35) {
+        g.scrolling = true; event.preventDefault(); hand.scrollLeft = g.scrollLeft - dx; return;
+      }
+      if (g.type === 'touch' && dy >= -10) { if (dy > 12) cancel(); return; }
+      if (!canPlay(g.cardId)) { cancel(); return; }
       pick(g.cardId);
       const r = g.button.getBoundingClientRect();
       g.ghost = g.button.cloneNode(true);
@@ -329,6 +368,7 @@ export function configureCardDrag({ hand, zone, canPlay, context, pick, submit }
       g.ghost.tabIndex = -1;
       g.ghost.className = `${g.button.className} card-drag-ghost`;
       g.ghost.style.width = `${r.width}px`; g.ghost.style.height = `${r.height}px`;
+      g.ghost.style.setProperty('--drag-lift', g.type === 'touch' ? '-48px' : '0px');
       document.body.append(g.ghost);
       g.button.classList.add('drag-source');
       g.button.setPointerCapture(event.pointerId);
@@ -345,9 +385,11 @@ export function configureCardDrag({ hand, zone, canPlay, context, pick, submit }
     if (!g || g.pointerId !== event.pointerId) return;
     const dragged = Boolean(g.ghost);
     const valid = dragged && g.context === context() && canPlay(g.cardId) && overTable(event.clientX, event.clientY);
-    if (dragged) suppressClick = g.cardId;
+    const tapped = g.type === 'touch' && tap && !dragged && !g.scrolling && g.context === context() && !g.button.disabled && Math.hypot(event.clientX - g.x, event.clientY - g.y) < 12;
+    if (dragged || g.scrolling || tapped) suppressClick = g.cardId;
     clean();
     if (valid) submit(g.cardId);
+    else if (tapped) tap(g.cardId);
   });
   const interrupted = event => { if (gesture?.pointerId === event.pointerId) cancel(); };
   document.addEventListener('pointercancel', interrupted);
@@ -356,12 +398,12 @@ export function configureCardDrag({ hand, zone, canPlay, context, pick, submit }
   document.addEventListener('visibilitychange', () => { if (document.hidden) cancel(); });
   globalThis.addEventListener?.('blur', cancel);
   function cancel() {
-    if (gesture?.ghost) suppressClick = gesture.cardId;
+    if (gesture?.ghost || gesture?.scrolling) suppressClick = gesture.cardId;
     clean();
   }
   return {
     cancel,
-    validate() { if (gesture && (gesture.context !== context() || !canPlay(gesture.cardId))) cancel(); },
+    validate() { if (gesture && (gesture.context !== context() || (gesture.ghost && !canPlay(gesture.cardId)))) cancel(); },
     consumeClick(cardId, detail) {
       const suppress = detail !== 0 && suppressClick === cardId;
       suppressClick = null;

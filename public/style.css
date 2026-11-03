@@ -120,3 +120,39 @@
 @media(orientation:portrait) and (max-width:850px), (orientation:landscape) and (max-height:600px) and (max-width:740px){.round-table .seat-progress{padding:2px 0}.round-table .seat-progress span{font-size:8px}}
 @media(orientation:portrait) and (max-width:850px){.game-panel{grid-template-columns:minmax(0,1fr)}.game-top,.game-status,.round-table,#hand-area{min-width:0}.game-top{flex-wrap:wrap}.game-top h2{margin:0}.round-table{width:100%;max-width:100%}}
 @media(orientation:portrait) and (min-width:360px) and (max-width:850px){.round-table .seat-progress span{font-size:10px}}
+
+/* A compact hand leaves the field visible; the same cards expand above the dock. */
+.is-playing{padding-bottom:120px}
+.game-panel .round-table{height:calc(100dvh - 210px);min-height:260px}
+#hand-area{position:fixed;z-index:20;bottom:0;left:50%;transform:translateX(-50%);width:min(1100px,100%);display:flex;flex-direction:column;gap:0;padding:0 max(12px,env(safe-area-inset-right)) env(safe-area-inset-bottom) max(12px,env(safe-area-inset-left));border:1px solid #cdb98440;border-bottom:0;border-radius:20px 20px 0 0;background:linear-gradient(180deg,#203b36f5,#0b2223);box-shadow:0 -8px 30px #0005}
+#hand-toggle{width:100%;min-height:44px;padding:8px 8px 0;background:none;border:0;color:#ead8ad;box-shadow:none;border-radius:12px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
+#hand-toggle .hand-heading{display:flex;justify-content:space-between;align-items:center;margin:0;min-height:30px;gap:8px}
+#hand-toggle-label{font-size:13px}#hand-count{font-size:11px;font-weight:400}
+#hand-preview{display:grid;grid-template-columns:repeat(var(--preview-count,1),minmax(0,1fr));max-width:580px;margin:5px auto 0;height:51px;padding:3px 10px 0;overflow:hidden;text-align:left}
+.mini-card{display:block;width:60px;height:70px;border:1px solid #c5b488;border-radius:7px 7px 0 0;background-color:#eee9d9;padding:6px 3px;font:700 16px Georgia,serif;box-shadow:-3px 0 6px #0004;transform:rotate(-3deg);transform-origin:50% 100%}
+.mini-card:is(.card-pirate,.card-king,.card-tigress){background:#41302a}.mini-card.card-mermaid{background:#275361}
+#hand-area.hand-expanded{padding-top:3px}
+#hand-area .hand{flex:none;gap:12px;min-height:0;margin:0;padding:18px 8px 12px;overflow-x:auto;overscroll-behavior:contain;touch-action:pan-x;scrollbar-width:thin}
+#hand-area .hand .playing-card{width:108px;height:154px;flex:0 0 108px;margin:0;padding:8px;touch-action:none;-webkit-touch-callout:none;transition:transform .12s ease,box-shadow .12s ease}
+#hand-area .hand .playing-card strong{font-size:25px;top:7px;right:9px}
+#hand-area .hand .card-symbol{font-size:13px;top:10px;left:9px}
+#hand-area .hand .card-art{width:72px;height:82px;top:32px}
+#hand-area .hand .playing-card small{font-size:12px;bottom:12px}
+#hand-area .hand .playing-card.selected{transform:translateY(-10px)}
+#hand-area .hand-dock{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;width:100%;max-width:none;margin:0;padding:0 4px 12px;min-height:0}
+#hand-area .card-inspect{font-size:12px;line-height:1.5;flex:1;min-width:0}
+#hand-area .play-controls{flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:8px;max-width:55%}
+#hand-area .play-controls>button{min-height:46px;min-width:180px;font-size:13px;padding:10px 14px}
+#hand-area .play-controls label{font-size:11px;gap:8px}#hand-area #tigress-mode{min-height:44px;font-size:12px}
+.card-drag-ghost{transform:translate(-50%,calc(-60% + var(--drag-lift,0px))) rotate(-7deg)!important}
+@media(orientation:portrait) and (max-width:850px){
+ .landscape-hint{display:none}.game-panel .round-table{height:calc(100dvh - 260px);min-height:300px}
+ #hand-area .hand-dock{flex-direction:column;align-items:stretch;gap:6px}#hand-area .play-controls{max-width:none;width:100%;flex-wrap:nowrap}#hand-area .play-controls>button{min-width:0;flex:1}#hand-area .play-controls label{flex-direction:column;gap:2px;align-items:flex-start}#hand-area .card-inspect{min-height:36px;font-size:11px}
+ .mini-card{width:48px;font-size:14px}#hand-preview{padding-left:0;padding-right:16px}
+}
+@media(orientation:landscape) and (max-height:600px){
+ .is-playing{padding-bottom:90px}.game-panel .round-table{height:calc(100dvh - 155px);min-height:170px}
+ #hand-toggle{padding-top:2px}#hand-toggle .hand-heading{min-height:26px}#hand-preview{height:37px;margin-top:0}.mini-card{font-size:14px;padding-top:4px}
+ #hand-area .hand{padding:12px 6px 8px;gap:10px}#hand-area .hand .playing-card{width:82px;height:112px;flex-basis:82px}#hand-area .hand .card-art{width:52px;height:57px;top:26px}#hand-area .hand .playing-card strong{font-size:19px;top:5px}#hand-area .hand .card-symbol{font-size:10px;top:8px}#hand-area .hand .playing-card small{font-size:10px;bottom:8px}#hand-area .hand-dock{padding-bottom:6px}#hand-area .card-inspect{font-size:10px}#hand-area .play-controls>button{min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){#hand-area .hand .playing-card{transition:none}#hand-area .hand .playing-card.selected{transform:none}}

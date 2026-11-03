@@ -43,6 +43,10 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
         playableCardIds: [], submittedCount: 0, timeLimits: { bidSeconds: 20, playSeconds: 15 } },
     };
     renderGame(state, false);
+    assert.equal(get('hand').hidden, true, 'field overview starts with a collapsed hand');
+    get('hand-toggle').fire('click');
+    assert.equal(get('hand').hidden, false);
+    assert.equal(get('hand-toggle').attributes['aria-expanded'], 'true');
     const ownSeat = get('scoreboard').children.find(row => row.classList.contains('my-seat'));
     const otherSeat = get('scoreboard').children.find(row => !row.classList.contains('my-seat'));
     assert.equal(ownSeat.dataset.seat, '2', 'server seat order takes precedence over lobby order');
@@ -66,6 +70,11 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
     assert.equal(get('bid-value').value, '2');
     assert.deepEqual([ownSeat.attributes['--seat-x'], ownSeat.attributes['--seat-y']], ownPosition);
     assert.equal(get('hand').children, hand, 'progress updates preserve the actual hand DOM');
+    assert.equal(get('hand').hidden, false, 'polling does not collapse the expanded hand');
+    get('hand-toggle').fire('click');
+    assert.equal(get('hand').hidden, true);
+    get('hand-toggle').fire('click');
+    assert.equal(get('hand').children, hand, 'folding preserves the same card buttons');
     assert.equal(get('tigress-mode').value, 'escape');
     get('bid-form').fire('submit');
     assert.deepEqual(requests.at(-1), { path: 'game/bid', body: { gameId: 'game1', round: 2, bid: 2 } });
@@ -92,11 +101,20 @@ test('게임 UI: 예측·선택 보존, 제출 권한, 트릭 승리와 라운�
     syncGameControls(false); // failed requests return here, retaining card and mode for retry
     assert.equal(get('tigress-mode').value, 'escape');
     assert.equal(hand[0].attributes['aria-pressed'], 'true');
+    assert.equal(get('hand').hidden, false, 'failed submission retains the expanded hand');
     get('play-submit').fire('click');
     assert.deepEqual(requests.at(-1), { path: 'game/play', body: { gameId: 'game1', round: 2, trickNumber: 1, cardId: 't', mode: 'escape' } });
     get('hand').fire('click', hand[1]);
     assert.ok(get('play-submit').disabled, 'inspecting an illegal card cannot enable submission');
     assert.match(get('card-inspect').textContent, /지금은 낼 수 없습니다/);
+    get('hand').fire('click', hand[0]);
+    state.game.hand = [green];
+    renderGame(state, false);
+    assert.equal(get('hand').hidden, true, 'confirmed card removal restores field overview');
+    assert.equal(get('hand-preview').children.length, 1);
+    get('hand-toggle').fire('click');
+    get('round-table').fire('pointerdown');
+    assert.equal(get('hand').hidden, true, 'tapping the field folds the hand');
 
     state.game.trick = [{ playerId: 'other', card: green }];
     renderGame(state, false);

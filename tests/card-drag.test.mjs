@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { configureCardDrag } from '../public/game-ui.js';
 
 class Target {
-  listeners = {}; dataset = {}; style = {}; className = 'playing-card'; capture = null;
+  listeners = {}; dataset = {}; style = { setProperty() {} }; className = 'playing-card'; capture = null; scrollLeft = 100;
   classList = { add() {}, remove() {}, toggle() {} };
   addEventListener(type, fn) { this.listeners[type] = fn; }
   fire(type, extra = {}) { this.listeners[type]?.({ target: this, pointerId: 1, button: 0, pointerType: 'mouse', clientX: 100, clientY: 400, preventDefault() {}, ...extra }); }
@@ -23,13 +23,13 @@ test('포인터 드래그: 테이블 제출, 밖/코너/취소/상태 변경 차
   const doc = new Target(), hand = new Target(), card = new Target(), zone = new Target();
   card.dataset.cardId = 'king';
   let legal = true, version = 'round1:trick1', surface = 'table';
-  const ghosts = [], picked = [], submitted = [];
+  const ghosts = [], picked = [], tapped = [], submitted = [];
   doc.getElementById = () => new Target();
   doc.body = { append: element => ghosts.push(element) };
   doc.elementFromPoint = () => ({ closest: selector => selector === '#round-table' && surface === 'table' ? zone : selector === '.score-player' && surface === 'seat' ? card : null });
   globalThis.document = doc;
   try {
-    const drag = configureCardDrag({ hand, zone, canPlay: () => legal, context: () => version, pick: id => picked.push(id), submit: id => submitted.push(id) });
+    const drag = configureCardDrag({ hand, zone, canPlay: () => legal, context: () => version, pick: id => picked.push(id), tap: id => tapped.push(id), submit: id => submitted.push(id) });
     const start = (extra = {}) => hand.fire('pointerdown', { target: card, ...extra });
     const move = (extra = {}) => doc.fire('pointermove', { clientX: 100, clientY: 100, ...extra });
     const release = (extra = {}) => doc.fire('pointerup', { clientX: 100, clientY: 100, ...extra });
@@ -54,11 +54,25 @@ test('포인터 드래그: 테이블 제출, 밖/코너/취소/상태 변경 차
     legal = true;
     const count = picked.length;
     start({ pointerType: 'touch' }); move({ clientX: 150, clientY: 398 }); release();
-    assert.equal(picked.length, count, 'horizontal touch belongs to native hand scrolling');
+    assert.equal(picked.length, count, 'horizontal touch scrolls without picking or submitting');
+    assert.equal(hand.scrollLeft, 50);
+    assert.ok(drag.consumeClick('king', 1), 'swipe cannot become a card selection');
     start({ pointerType: 'touch' }); move(); release();
     assert.equal(submitted.length, 2, 'upward touch drag submits');
+    start({ pointerType: 'touch' }); move({ clientX: 140, clientY: 360 }); move(); release();
+    assert.equal(submitted.length, 3, 'diagonal lift remains a drag');
+    legal = false;
+    start({ pointerType: 'touch' }); move({ clientX: 70, clientY: 400 }); release();
+    assert.equal(hand.scrollLeft, 80, 'unplayable cards can still scroll the hand');
+    assert.equal(submitted.length, 3);
+    legal = true;
+    start({ pointerType: 'touch' }); release({ clientY: 400 });
+    assert.deepEqual(tapped, ['king'], 'touch release selects even without a browser click');
+    assert.ok(drag.consumeClick('king', 1), 'delayed browser click cannot undo touch selection');
+    start({ pointerType: 'touch' }); doc.fire('pointercancel'); release({ clientY: 400 });
+    assert.equal(tapped.length, 1, 'cancelled touch cannot select');
     start(); release();
-    assert.equal(submitted.length, 2, 'a tap without a drag cannot submit');
+    assert.equal(submitted.length, 3, 'a tap without a drag cannot submit');
     assert.equal(drag.consumeClick('king', 0), false, 'keyboard activation remains available');
     assert.ok(ghosts.every(ghost => ghost.removed));
   } finally { globalThis.document = original; }
